@@ -15,11 +15,12 @@ Arduino based HVAC system for a small greenhouse. Uses a modified household thre
 
 ## Arduino Parts
 * Arduino Uno
-* 16 Channel Relay Module
+* 16 Channel Relay Module (currently 11 channels used)
 * 4 Channel Relay Module (for modified evaporative cooler, keeps mains voltage outside HVAC controls enclosure)
 * 12 Volt Power Supply (Modified computer PSU can supply 12VDC and 5VDC)
 * DS18B20 Waterproof Temperature Sensors (1 for each heating zone)
 * DHT11 Sensors (Used for greenhouse ambient temperature and humidity, additional needed for outside ambient temperature)
+* Raspberry Pi added for data collection and processing
 
 ## Installation
 * Download or clone repository
@@ -29,3 +30,4 @@ Arduino based HVAC system for a small greenhouse. Uses a modified household thre
 * DHT.h
 * OneWire.h
 * DallasTemperature.h
+* Adafruit Unified Sensor library has to be installed but does not need to be included in the sketch. (required by DHT.h to work)
