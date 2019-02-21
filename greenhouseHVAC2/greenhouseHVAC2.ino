@@ -10,12 +10,15 @@
 #include "DallasTemperature.h" // Library needed for DS18B20 sensors
 
 
-int data[10]; // Array of temperature and humidity readings
+int data[11]; // Array of temperature and humidity readings
 int pinState[14]; // Array of pin output state
 int setPointArray[11]; // Array of set point temperatures
-int ds18B20[6]; //DS18B20 sensor addresses, array position equals label number
+//int ds18B20[6]; //DS18B20 sensor addresses, array position equals label number
 int coolingStage = 0; // init cooling stage and assign 0
+int count = 0; // Var used for water heater reset to bypass extended use shutdown
+const int analogPins[] = {A0,A1,A2,A3,A4};
 
+/*
 // Assign all pin outputs
 const int lowFanPin = data[12]; // Low speed cooling fan relay output
 const int medFanPin = data[11]; // Medium speed cooling fan relay output
@@ -28,14 +31,14 @@ const int heatPump4Pin = data[5]; // Hot water pump table 1 relay output
 const int heatPump3Pin = data[4]; // Hot water pump hydroponic reservoir relay output
 const int heatPump2Pin = data[3]; // Hot water pump hydroponic reservoir relay output
 const int heatPump1Pin = data[2]; // Main hot water reservoir relay output
+*/
 
 //Assign all pin inputs
-const int boardTempPin = A0; // Board temperature sensor
-const int indoorTempPin = A1; // Greenhouse temperature DHT sensor
-const int outdoorTempPin = A2; // Outdoor ambient temperature DHT sensor
-const int tempZonePin = A3; // All DS18B20 sensors
-const int zoneTempPin = A3;
-const int lowWaterPin = A4; // Evaporative cooler low water sensor
+//const int boardTempPin = analogPins[0]; // Board temperature sensor
+const int indoorTempPin = analogPins[1]; // Greenhouse temperature DHT sensor
+const int outdoorTempPin = analogPins[2]; // Outdoor ambient temperature DHT sensor
+const int tempZonePin = analogPins[3]; // All DS18B20 sensors
+//const int lowWaterPin = analogPins[4]; // Evaporative cooler low water sensor
 
 
 
@@ -50,8 +53,11 @@ OneWire oneWire(tempZonePin);
 DallasTemperature sensors(&oneWire);
 // DS18B20 Sensor Addresses
 // tempZone devices 4 and 5 damaged, need replacement
-DeviceAddress t5 = { 0x28, 0xAA, 0xA0, 0x3D, 0x1B, 0x13, 0x02, 0xE5 };
-DeviceAddress t4 = { 0x28, 0xAA, 0xDE, 0xB3, 0x1B, 0x13, 0x02, 0xE6 };
+DeviceAddress t8 = { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 };
+DeviceAddress t7 = { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 };
+DeviceAddress t6 = { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }; // Assigned Ambient
+DeviceAddress t5 = { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }; // Assigned Hyrdro reservoir 2 (NFT)
+DeviceAddress t4 = { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }; // Assigned Hydro reservoir 1 (Dutch Bucket)
 DeviceAddress t3 = { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }; // Assigned second bench
 DeviceAddress t2 = { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }; // Assigned first bench
 DeviceAddress t1 = { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }; // Assigned main reservoir
@@ -59,13 +65,20 @@ DeviceAddress t1 = { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }; // Assign
 void setup() {
   Serial.begin(9600);
 
+/*
   //Setup Pin I/O
   pinMode(boardTempPin, INPUT);
   pinMode(indoorTempPin, INPUT);
   pinMode(outdoorTempPin, INPUT);
   pinMode(tempZonePin, INPUT);
   pinMode(lowWaterPin, INPUT);
-
+*/
+  
+  // Setup all analog pins for INPUT
+  for (int i = 0; i <= 4; i++) {
+    pinMode(analogPins[i], INPUT);
+  }
+  
   //Setup OUTPUT pins and initialize is HIGH state (relay OFF)
   for (int i = 2; i <= 12; i++) {
     pinMode(i, OUTPUT);
@@ -77,7 +90,7 @@ void setup() {
   indoorSensor.begin();
   outdoorSensor.begin();
 
-  // Set heating and cooling temperatures
+  // Set heating and cooling temperatures in degrees F
   setPointArray[0] = 70; // Cooling Stage -1
   setPointArray[1] = 75; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
@@ -97,6 +110,7 @@ void loop() {
   setPoint();
   fanSpeed();
   heat();
+  heaterCount();
   writePins();
   printData();
   delay(1000);
@@ -117,9 +131,8 @@ void readDHT() {
  * This avoids cooling fan constantly changing speeds with small temperature changes
  * Heating will not engage until cooling stage is -1, heating and cooling cannot both be ON at one time
  */
- 
 void setPoint() {
-  int indoorTemp = data[6]; // Read indoor temp and assign to var indoorTemp
+  int indoorTemp = data[10]; // Read indoor temp and assign to var indoorTemp
   if (indoorTemp <= setPointArray[0]) {
     coolingStage = -1;
     return;
@@ -206,13 +219,14 @@ void heat() {
   }
 }
 
-// Read all zone temperatures (DS1820B sensor)
+// Read all zone temperatures (DS1820B sensor) and write to data array
 void readZoneTemps() {
     data[1] = sensors.getTempF(t1);
     data[2] = sensors.getTempF(t2);
     data[3] = sensors.getTempF(t3);
     data[4] = sensors.getTempF(t4);
     data[5] = sensors.getTempF(t5);
+    data[10] = sensors.getTempF(t8);
 }
 
 // Write all the pin states on OUTPUT pins
@@ -220,6 +234,16 @@ void writePins() {
   for (int i = 2; i <= 13; i++) {
     digitalWrite(i, pinState[i]); 
   }
+}
+
+// Water heater shutoff bypass, turn OFF reservoir heater pump for 5 seconds every 10 minutes
+void heaterCount() {
+  if (count >= 120) { // program has 2+2+1=5 seconds of delay in it, turn OFF pump every 120 program cycles
+    digitalWrite(2, HIGH); // Turn OFF reservoir pump
+    delay(5000); // Wait 5 seconds
+    count = 0; // Reset counter
+  }  
+  count++; 
 }
 
 // Print all the temperature and pin state data for 
