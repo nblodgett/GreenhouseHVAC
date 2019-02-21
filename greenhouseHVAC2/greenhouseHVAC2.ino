@@ -90,6 +90,9 @@ void setup() {
   indoorSensor.begin();
   outdoorSensor.begin();
 
+  //DS18B20 Sensor Setup
+  sensors.begin();
+
   // Set heating and cooling temperatures in degrees F
   setPointArray[0] = 70; // Cooling Stage -1
   setPointArray[1] = 75; // Cooling Stage 0
@@ -113,7 +116,7 @@ void loop() {
   heaterCount();
   writePins();
   printData();
-  delay(1000);
+  
 }
 
 // Read and write DHT readings
@@ -192,6 +195,7 @@ int setPumpAndVent (int x) {
   }
 }
 
+
 void heat() {
   int temp = data[6]; // Actual res temp
   int setMin = setPointArray[5]; // Minimum res temp set point
@@ -207,26 +211,35 @@ void heat() {
   
   // Heating logic for benches and hydro reservoirs
   for(int i = 1; i <= 5; i++) {
-    pin = pinState[i + 1]; // Which pin to change state of pump
-    setMax = setPoint[i + 4]; // Match correct temp in array to the pump
-    temp = data[i +1]; // Temp reading for area
+    int x = 2;
+    int y = 5;
+    int z = 2;
+    pin = pinState[x]; // Which pin to change state of pump
+    setMax = setPoint[y]; // Match correct temp in array to the pump
+    temp = data[i]; // Temp reading for area
     if (temp < setMax) {
       pin = LOW; // Turn ON pump
     }
     if (temp > setMax) {
       pin = HIGH; // Turn OFF pump
     }
+    x++;
+    y++;
+    z++;
   }
 }
 
+
 // Read all zone temperatures (DS1820B sensor) and write to data array
 void readZoneTemps() {
+    sensors.requestTemperatures();
     data[1] = sensors.getTempF(t1);
     data[2] = sensors.getTempF(t2);
     data[3] = sensors.getTempF(t3);
     data[4] = sensors.getTempF(t4);
     data[5] = sensors.getTempF(t5);
     data[10] = sensors.getTempF(t8);
+    delay(1000);
 }
 
 // Write all the pin states on OUTPUT pins
