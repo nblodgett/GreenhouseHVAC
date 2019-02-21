@@ -16,21 +16,21 @@ int setPointArray[11]; // Array of set point temperatures
 //int ds18B20[6]; //DS18B20 sensor addresses, array position equals label number
 int coolingStage = 0; // init cooling stage and assign 0
 int count = 0; // Var used for water heater reset to bypass extended use shutdown
-const int analogPins[] = {A0,A1,A2,A3,A4};
+const int analogPins[] = {A0, A1, A2, A3, A4};
 
 /*
-// Assign all pin outputs
-const int lowFanPin = data[12]; // Low speed cooling fan relay output
-const int medFanPin = data[11]; // Medium speed cooling fan relay output
-const int highFanPin = data[10]; // High speed cooling fan relay output
-const int coolingPumpPin = data[9]; // Evaporative cooling water pump relay output
-const int actuator2Pin = data[8]; // Exhaust vent actuator 2 relay output
-const int actuator1Pin = data[7]; // Exhaust vent actuator 1 relay output
-const int heatPump5Pin = data[6]; // Hot water pump table 2 relay output
-const int heatPump4Pin = data[5]; // Hot water pump table 1 relay output
-const int heatPump3Pin = data[4]; // Hot water pump hydroponic reservoir relay output
-const int heatPump2Pin = data[3]; // Hot water pump hydroponic reservoir relay output
-const int heatPump1Pin = data[2]; // Main hot water reservoir relay output
+  // Assign all pin outputs
+  const int lowFanPin = [12]; // Low speed cooling fan relay output
+  const int medFanPin = [11]; // Medium speed cooling fan relay output
+  const int highFanPin = [10]; // High speed cooling fan relay output
+  const int coolingPumpPin = [9]; // Evaporative cooling water pump relay output
+  const int actuator2Pin = [8]; // Exhaust vent actuator 2 relay output
+  const int actuator1Pin = [7]; // Exhaust vent actuator 1 relay output
+  const int heatPump5Pin = [6]; // Hot water pump table 2 relay output
+  const int heatPump4Pin = [5]; // Hot water pump table 1 relay output
+  const int heatPump3Pin = [4]; // Hot water pump hydroponic reservoir relay output
+  const int heatPump2Pin = [3]; // Hot water pump hydroponic reservoir relay output
+  const int heatPump1Pin = [2]; // Main hot water reservoir relay output
 */
 
 //Assign all pin inputs
@@ -65,27 +65,27 @@ DeviceAddress t1 = { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }; // Assign
 void setup() {
   Serial.begin(9600);
 
-/*
-  //Setup Pin I/O
-  pinMode(boardTempPin, INPUT);
-  pinMode(indoorTempPin, INPUT);
-  pinMode(outdoorTempPin, INPUT);
-  pinMode(tempZonePin, INPUT);
-  pinMode(lowWaterPin, INPUT);
-*/
-  
+  /*
+    //Setup Pin I/O
+    pinMode(boardTempPin, INPUT);
+    pinMode(indoorTempPin, INPUT);
+    pinMode(outdoorTempPin, INPUT);
+    pinMode(tempZonePin, INPUT);
+    pinMode(lowWaterPin, INPUT);
+  */
+
   // Setup all analog pins for INPUT
   for (int i = 0; i <= 4; i++) {
     pinMode(analogPins[i], INPUT);
   }
-  
+
   //Setup OUTPUT pins and initialize is HIGH state (relay OFF)
   for (int i = 2; i <= 12; i++) {
     pinMode(i, OUTPUT);
     pinState[i] = HIGH;
   }
   writePins();
-  
+
   // DHT11 Sensor Setup
   indoorSensor.begin();
   outdoorSensor.begin();
@@ -116,7 +116,7 @@ void loop() {
   heaterCount();
   writePins();
   printData();
-  
+
 }
 
 // Read and write DHT readings
@@ -131,9 +131,9 @@ void readDHT() {
 }
 
 /* Basic HVAC logic is cooling stage only increases (fan speed only increase) until temp cools to setpoint 0, then turns OFF
- * This avoids cooling fan constantly changing speeds with small temperature changes
- * Heating will not engage until cooling stage is -1, heating and cooling cannot both be ON at one time
- */
+   This avoids cooling fan constantly changing speeds with small temperature changes
+   Heating will not engage until cooling stage is -1, heating and cooling cannot both be ON at one time
+*/
 void setPoint() {
   int indoorTemp = data[10]; // Read indoor temp and assign to var indoorTemp
   if (indoorTemp <= setPointArray[0]) {
@@ -159,7 +159,7 @@ void fanSpeed() {
   if (coolingStage <= 0) {
     setPumpAndVent(HIGH);
     for (int i = 10; i <= 12; i++) {
-      pinState[i]= HIGH;
+      pinState[i] = HIGH;
     }
   }
 
@@ -190,76 +190,93 @@ void fanSpeed() {
 
 // Set cooling pump and vent to HIGH OR LOW by passing in HIGH OR LOW
 int setPumpAndVent (int x) {
-  for (int i = 7; i <=9; i++) {
+  for (int i = 7; i <= 9; i++) {
     pinState[i] = x;
   }
 }
 
-
+// Function that runs heating for  benches and reservoirs
 void heat() {
-  int temp = data[6]; // Actual res temp
+  // Turn off heating and exit heat function if cooling is on
+  if(coolingStage > -1) {
+    for(int i = 2; i <=6; i++) {
+    pinState[i] = HIGH;
+    }
+    return;
+  }
+
+  int temp = data[10]; // Actual res temp
   int setMin = setPointArray[5]; // Minimum res temp set point
   int setMax = setPointArray[6]; // Maximum res temp set point
-  int pin = pinState[2]; // Pin to change state  
+  //int pin = pinState[2]; // Pin to change state
   // Main res heating logic
-  if (temp <= setMin) {
-    pin = LOW; // Turn ON pump
+  if (temp < setMin) {
+    pinState[2] = LOW; // Turn ON pump
   }
-  if (temp >= setMax) {
-    pin = HIGH; // Turn OFF pump
+  if (temp > setMax) {
+    pinState[2] = HIGH; // Turn OFF pump
   }
-  
+
   // Heating logic for benches and hydro reservoirs
-  for(int i = 1; i <= 5; i++) {
-    int x = 2;
-    int y = 5;
-    int z = 2;
-    pin = pinState[x]; // Which pin to change state of pump
-    setMax = setPoint[y]; // Match correct temp in array to the pump
-    temp = data[i]; // Temp reading for area
-    if (temp < setMax) {
-      pin = LOW; // Turn ON pump
-    }
-    if (temp > setMax) {
-      pin = HIGH; // Turn OFF pump
-    }
-    x++;
-    y++;
-    z++;
+  // Could not get a for loop to work for looping through this
+  int x = 3; // Start with pin 3
+  int y = 7; // Start with setPoint[7] (temp)
+  int z = 2; // Start with data array remp [2]
+  //pin = pinState[x]; // Which pin to change state of pump
+  setMax = setPoint[y]; // Match correct temp in array to the pump
+  temp = data[z]; // Temp reading for area
+  if (temp < setMax) {
+    pinState[x] = LOW; // Turn ON pump
   }
+  if (temp > setMax) {
+    pinState[x] = HIGH; // Turn OFF pump
+  }
+  x++;
+  y++;
+  z++;
+  
+  setMax = setPoint[y]; // Match correct temp in array to the pump
+  temp = data[z]; // Temp reading for area
+  if (temp < setMax) {
+    pinState[x] = LOW; // Turn ON pump
+  }
+  if (temp > setMax) {
+    pinState[x] = HIGH; // Turn OFF pump
+  }
+
 }
 
 
 // Read all zone temperatures (DS1820B sensor) and write to data array
 void readZoneTemps() {
-    sensors.requestTemperatures();
-    data[1] = sensors.getTempF(t1);
-    data[2] = sensors.getTempF(t2);
-    data[3] = sensors.getTempF(t3);
-    data[4] = sensors.getTempF(t4);
-    data[5] = sensors.getTempF(t5);
-    data[10] = sensors.getTempF(t8);
-    delay(1000);
+  sensors.requestTemperatures();
+  data[1] = sensors.getTempF(t1);
+  data[2] = sensors.getTempF(t2);
+  data[3] = sensors.getTempF(t3);
+  data[4] = sensors.getTempF(t4);
+  data[5] = sensors.getTempF(t5);
+  data[10] = sensors.getTempF(t6);
+  delay(1000);
 }
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
   for (int i = 2; i <= 13; i++) {
-    digitalWrite(i, pinState[i]); 
+    digitalWrite(i, pinState[i]);
   }
 }
 
-// Water heater shutoff bypass, turn OFF reservoir heater pump for 5 seconds every 10 minutes
+// Water heater shutoff bypass, turn OFF reservoir heater pump for 10 seconds every 10 minutes
 void heaterCount() {
-  if (count >= 120) { // program has 2+2+1=5 seconds of delay in it, turn OFF pump every 120 program cycles
+  if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 120 program cycles
     digitalWrite(2, HIGH); // Turn OFF reservoir pump
-    delay(5000); // Wait 5 seconds
+    delay(10000); // Wait 10 seconds
     count = 0; // Reset counter
-  }  
-  count++; 
+  }
+  count++;
 }
 
-// Print all the temperature and pin state data for 
+// Print all the temperature and pin state data for
 void printData() {
   for (int i = 1; i <= 10; i++) {
     Serial.print(data[i]);
@@ -270,4 +287,8 @@ void printData() {
     Serial.print(",");
   }
   Serial.println(" ");
+  Serial.print("Cooling Stage: ");
+  Serial.println(coolingStage);
+  Serial.print("Count: ");
+  Serial.println(count);
 }
