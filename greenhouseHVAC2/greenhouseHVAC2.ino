@@ -99,8 +99,8 @@ void setup() {
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
   setPointArray[4] = 90; // Cooling Stage 3
-  setPointArray[5] = 125; // Min Res Temp
-  setPointArray[6] = 130; // Max Res Temp
+  setPointArray[5] = 110; // Min Res Temp
+  setPointArray[6] = 115; // Max Res Temp
   setPointArray[7] = 74; // Bench 1 Temp
   setPointArray[8] = 74; // Bench 2 Temp
   setPointArray[9] = 74; // Hydro Res 1 (NFT Channel) Temp
@@ -198,17 +198,16 @@ int setPumpAndVent (int x) {
 // Function that runs heating for  benches and reservoirs
 void heat() {
   // Turn off heating and exit heat function if cooling is on
-  if(coolingStage > -1) {
-    for(int i = 2; i <=6; i++) {
-    pinState[i] = HIGH;
+  if (coolingStage > -1) {
+    for (int i = 2; i <= 6; i++) {
+      pinState[i] = HIGH;
     }
     return;
   }
 
-  int temp = data[10]; // Actual res temp
+  int temp = data[1]; // Reservoir temp
   int setMin = setPointArray[5]; // Minimum res temp set point
   int setMax = setPointArray[6]; // Maximum res temp set point
-  //int pin = pinState[2]; // Pin to change state
   // Main res heating logic
   if (temp < setMin) {
     pinState[2] = LOW; // Turn ON pump
@@ -217,34 +216,27 @@ void heat() {
     pinState[2] = HIGH; // Turn OFF pump
   }
 
-  // Heating logic for benches and hydro reservoirs
-  // Could not get a for loop to work for looping through this
-  int x = 3; // Start with pin 3
-  int y = 7; // Start with setPoint[7] (temp)
-  int z = 2; // Start with data array remp [2]
-  //pin = pinState[x]; // Which pin to change state of pump
-  setMax = setPoint[y]; // Match correct temp in array to the pump
-  temp = data[z]; // Temp reading for area
-  if (temp < setMax) {
-    pinState[x] = LOW; // Turn ON pump
-  }
-  if (temp > setMax) {
-    pinState[x] = HIGH; // Turn OFF pump
-  }
-  x++;
-  y++;
-  z++;
-  
-  setMax = setPoint[y]; // Match correct temp in array to the pump
-  temp = data[z]; // Temp reading for area
-  if (temp < setMax) {
-    pinState[x] = LOW; // Turn ON pump
-  }
-  if (temp > setMax) {
-    pinState[x] = HIGH; // Turn OFF pump
-  }
+  /* Heating Logic
+     Loop through zone 2-5, and turn ON heat pump if temperature is less than set point
+  */
 
+  int pin = 3; // Pin of heat pump
+  int set = 7; // Defined heat set point of zone in array
+  int var = 2; // Measured temp of heated zone in array
+  for (int i = 2; i <= 5; i++) {
+    if (data[var] < setPointArray[set]) { // If measured temp is less than set temp
+      pinState[pin] = LOW; // Turn ON heat pump
+    }
+    else {
+      pinState[pin] = HIGH; // Turn OFF heat pump
+      Serial.println("heat OFF");
+    }
+    pin++;
+    set++;
+    var++;
+  }
 }
+
 
 
 // Read all zone temperatures (DS1820B sensor) and write to data array
@@ -270,7 +262,7 @@ void writePins() {
 void heaterCount() {
   if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 120 program cycles
     digitalWrite(2, HIGH); // Turn OFF reservoir pump
-    delay(10000); // Wait 10 seconds
+    delay(60000); // Wait 60 seconds
     count = 0; // Reset counter
   }
   count++;
