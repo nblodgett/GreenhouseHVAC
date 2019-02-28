@@ -251,6 +251,7 @@ void readZoneTemps() {
   delay(1000);
 
   // If temperature is outside of normal range or returns error, replace with value 999
+  for(int i = 1; i <= 10; i++) {
     if(data[i] > 140 || data[i] < -40) {
       data[i] = 999;
     }
