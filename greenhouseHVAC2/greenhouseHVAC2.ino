@@ -101,10 +101,10 @@ void setup() {
   setPointArray[4] = 90; // Cooling Stage 3
   setPointArray[5] = 110; // Min Res Temp
   setPointArray[6] = 115; // Max Res Temp
-  setPointArray[7] = 74; // Bench 1 Temp
-  setPointArray[8] = 74; // Bench 2 Temp
-  setPointArray[9] = 74; // Hydro Res 1 (NFT Channel) Temp
-  setPointArray[10] = 74; // Hydro Res 2 (Bench 1 Res) Temp
+  setPointArray[7] = 72; // Bench 1 Temp
+  setPointArray[8] = 72; // Bench 2 Temp
+  setPointArray[9] = 72; // Hydro Res 1 (NFT Channel) Temp
+  setPointArray[10] = 72; // Hydro Res 2 (Bench 1 Res) Temp
 }
 
 void loop() {
