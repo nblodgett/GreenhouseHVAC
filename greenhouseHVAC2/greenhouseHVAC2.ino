@@ -249,6 +249,12 @@ void readZoneTemps() {
   data[5] = sensors.getTempF(t5);
   data[10] = sensors.getTempF(t6);
   delay(1000);
+
+  // If temperature is outside of normal range or returns error, replace with value 999
+    if(data[i] > 140 || data[i] < -40) {
+      data[i] = 999;
+    }
+  }
 }
 
 // Write all the pin states on OUTPUT pins
