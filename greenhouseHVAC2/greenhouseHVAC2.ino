@@ -81,7 +81,7 @@ void setup() {
   }
 
   //Setup OUTPUT pins and initialize is HIGH state (relay OFF)
-  for (int i = 2; i <= 12; i++) {
+  for (int i = 2; i <= 13; i++) {
     pinMode(i, OUTPUT);
     pinState[i] = HIGH;
   }
@@ -96,7 +96,7 @@ void setup() {
 
   // Set heating and cooling temperatures in degrees F
   setPointArray[0] = 55; // Cooling Stage -1
-  setPointArray[1] = 70; // Cooling Stage 0
+  setPointArray[1] = 78; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
   setPointArray[4] = 90; // Cooling Stage 3
@@ -117,16 +117,18 @@ void loop() {
   counter();
   writePins();
   printData();
-  
-  // TESTING MIST SYTEM
-  if (coolingStage > 0) {
+
+  /* TESTING MIST SYTEM
+
     digitalWrite(13, LOW); // Turn ON misters
+    Serial.println("MIST  ON");
     delay(5000); // Wait 5 seconds
     digitalWrite(13, HIGH); // Turn OFF misters
+    Serial.println("MIST OFF");
     delay(5000); // Wait 5 seconds
-  }
-  // TESTING MIST SYTEM
-  
+
+  */
+
 }
 
 // Read and write DHT readings
@@ -275,18 +277,23 @@ void writePins() {
   }
 }
 
-// Water heater shutoff bypass, turn OFF reservoir heater pump for 10 seconds every 10 minutes
+// Water heater shutoff bypass, turn OFF reservoir heater pump for 60 seconds every 10 minutes
+// Misting counter for cooling stages, curerntly set to all stages, turn on mist for 60 seconds every 10 minutes
+// 10 minutes is roughly 120 cycles, 12 cycles a minute
+
 void counter() {
-  if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 120 program cycles
+  if (count >= 12) { // program has about 5 seconds of delay in it, turn OFF pump every 'count' program cycles
 
     if (coolingStage < 0) {
       digitalWrite(2, HIGH); // Turn OFF reservoir pump
-      delay(60000); // Wait 60 seconds
+      delay(5000); // Wait 5 seconds
     }
     if (coolingStage > 0) {
       digitalWrite(13, LOW); // Turn ON misters
-      delay(60000); // Wait 60 seconds
+      Serial.println("MIST  ON");
+      delay(5000); // Wait 5 seconds
       digitalWrite(13, HIGH); // Turn OFF misters
+      Serial.println("MIST  OFF");
     }
     count = 0; // Reset counter
   }
