@@ -20,6 +20,7 @@ const int analogPins[] = {A0, A1, A2, A3, A4};
 
 /*
   // Assign all pin outputs
+  const in misterPin = [13]; // Misting relay output
   const int lowFanPin = [12]; // Low speed cooling fan relay output
   const int medFanPin = [11]; // Medium speed cooling fan relay output
   const int highFanPin = [10]; // High speed cooling fan relay output
@@ -94,13 +95,13 @@ void setup() {
   sensors.begin();
 
   // Set heating and cooling temperatures in degrees F
-  setPointArray[0] = 70; // Cooling Stage -1
-  setPointArray[1] = 75; // Cooling Stage 0
+  setPointArray[0] = 55; // Cooling Stage -1
+  setPointArray[1] = 70; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
   setPointArray[4] = 90; // Cooling Stage 3
-  setPointArray[5] = 110; // Min Res Temp
-  setPointArray[6] = 115; // Max Res Temp
+  setPointArray[5] = 90; // Min Res Temp
+  setPointArray[6] = 95; // Max Res Temp
   setPointArray[7] = 72; // Bench 1 Temp
   setPointArray[8] = 72; // Bench 2 Temp
   setPointArray[9] = 72; // Hydro Res 1 (NFT Channel) Temp
@@ -113,10 +114,19 @@ void loop() {
   setPoint();
   fanSpeed();
   heat();
-  heaterCount();
+  counter();
   writePins();
   printData();
-
+  
+  // TESTING MIST SYTEM
+  if (coolingStage > 0) {
+    digitalWrite(13, LOW); // Turn ON misters
+    delay(5000); // Wait 5 seconds
+    digitalWrite(13, HIGH); // Turn OFF misters
+    delay(5000); // Wait 5 seconds
+  }
+  // TESTING MIST SYTEM
+  
 }
 
 // Read and write DHT readings
@@ -251,8 +261,8 @@ void readZoneTemps() {
   delay(1000);
 
   // If temperature is outside of normal range or returns error, replace with value 999
-  for(int i = 1; i <= 10; i++) {
-    if(data[i] > 140 || data[i] < -40) {
+  for (int i = 1; i <= 10; i++) {
+    if (data[i] > 140 || data[i] < -40) {
       data[i] = 999;
     }
   }
@@ -266,10 +276,18 @@ void writePins() {
 }
 
 // Water heater shutoff bypass, turn OFF reservoir heater pump for 10 seconds every 10 minutes
-void heaterCount() {
+void counter() {
   if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 120 program cycles
-    digitalWrite(2, HIGH); // Turn OFF reservoir pump
-    delay(60000); // Wait 60 seconds
+
+    if (coolingStage < 0) {
+      digitalWrite(2, HIGH); // Turn OFF reservoir pump
+      delay(60000); // Wait 60 seconds
+    }
+    if (coolingStage > 0) {
+      digitalWrite(13, LOW); // Turn ON misters
+      delay(60000); // Wait 60 seconds
+      digitalWrite(13, HIGH); // Turn OFF misters
+    }
     count = 0; // Reset counter
   }
   count++;
