@@ -251,7 +251,8 @@ void heat() {
 
 
 
-// Read all zone temperatures (DS1820B sensor) and write to data array
+// FIX THIS Read all zone temperatures (DS1820B sensor) and write to data array
+/*
 void readZoneTemps() {
   sensors.requestTemperatures();
   data[1] = sensors.getTempF(t1);
@@ -259,6 +260,18 @@ void readZoneTemps() {
   data[3] = sensors.getTempF(t3);
   data[4] = sensors.getTempF(t4);
   data[5] = sensors.getTempF(t5);
+  data[10] = sensors.getTempF(t6);
+  delay(1000);
+*/
+
+// TEST to check all pumps using reservoir temperature
+void readZoneTemps() {
+  sensors.requestTemperatures();
+  data[1] = sensors.getTempF(t1);
+  data[2] = sensors.getTempF(t1);
+  data[3] = sensors.getTempF(t1);
+  data[4] = sensors.getTempF(t1);
+  data[5] = sensors.getTempF(t1);
   data[10] = sensors.getTempF(t6);
   delay(1000);
 
@@ -281,8 +294,10 @@ void writePins() {
 // Misting counter for cooling stages, curerntly set to all stages, turn on mist for 60 seconds every 10 minutes
 // 10 minutes is roughly 120 cycles, 12 cycles a minute
 
+
+// FIX THIS CYCLE DUTY COOLING AND HEATING TAKE DIFFERENT DUTY CYCLES
 void counter() {
-  if (count >= 12) { // program has about 5 seconds of delay in it, turn OFF pump every 'count' program cycles
+  if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 'count' program cycles
 
     if (coolingStage < 0) {
       digitalWrite(2, HIGH); // Turn OFF reservoir pump
