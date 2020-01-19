@@ -27,11 +27,11 @@ const int analogPins[] = {A0, A1, A2, A3, A4};
   const int coolingPumpPin = [9]; // Evaporative cooling water pump relay output
   const int actuator2Pin = [8]; // Exhaust vent actuator 2 relay output
   const int actuator1Pin = [7]; // Exhaust vent actuator 1 relay output
-  const int heatPump5Pin = [6]; // Hot water pump table 2 relay output
-  const int heatPump4Pin = [5]; // Hot water pump table 1 relay output
-  const int heatPump3Pin = [4]; // Hot water pump hydroponic reservoir relay output
-  const int heatPump2Pin = [3]; // Hot water pump hydroponic reservoir relay output
-  const int heatPump1Pin = [2]; // Main hot water reservoir relay output
+  const int heatPump5Pin = [6]; //
+  const int heatPump4Pin = [5]; //
+  const int heatPump3Pin = [4]; // Bench heat pump
+  const int heatPump2Pin = [3]; // Hydroponic res heat pump
+  const int heatPump1Pin = [2]; // Instant hot water heater pump
 */
 
 //Assign all pin inputs
@@ -56,12 +56,12 @@ DallasTemperature sensors(&oneWire);
 // tempZone devices 4 and 5 damaged, need replacement
 DeviceAddress t8 = { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 };
 DeviceAddress t7 = { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 };
-DeviceAddress t6 = { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }; // Assigned Ambient
-DeviceAddress t5 = { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }; // Assigned Hyrdro reservoir 2 (NFT)
-DeviceAddress t4 = { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }; // Assigned Hydro reservoir 1 (Dutch Bucket)
-DeviceAddress t3 = { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }; // Assigned second bench
-DeviceAddress t2 = { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }; // Assigned first bench
-DeviceAddress t1 = { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }; // Assigned main reservoir
+DeviceAddress t6 = { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }; // #6 Ambient temp
+DeviceAddress t3 = { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }; // #5 NFT reservoir temperature
+DeviceAddress t2 = { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }; // #4 Side bench temperature
+//DeviceAddress t3 = { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }; // Damaged, not used
+//DeviceAddress t2 = { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }; // Rear bench temperature
+DeviceAddress t1 = { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }; // #1 Reservoir temperature
 
 void setup() {
   Serial.begin(9600);
@@ -86,7 +86,7 @@ void setup() {
     pinState[i] = HIGH;
   }
   writePins();
-
+  // DHT unused
   // DHT11 Sensor Setup
   indoorSensor.begin();
   outdoorSensor.begin();
@@ -95,17 +95,17 @@ void setup() {
   sensors.begin();
 
   // Set heating and cooling temperatures in degrees F
-  setPointArray[0] = 55; // Cooling Stage -1
+  setPointArray[0] = 70; // Cooling Stage -1
   setPointArray[1] = 78; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
   setPointArray[4] = 90; // Cooling Stage 3
-  setPointArray[5] = 90; // Min Res Temp
-  setPointArray[6] = 95; // Max Res Temp
-  setPointArray[7] = 72; // Bench 1 Temp
-  setPointArray[8] = 72; // Bench 2 Temp
-  setPointArray[9] = 72; // Hydro Res 1 (NFT Channel) Temp
-  setPointArray[10] = 72; // Hydro Res 2 (Bench 1 Res) Temp
+  setPointArray[5] = 90; // Min Res Temp #1
+  setPointArray[6] = 95; // Max Res Temp #1
+  setPointArray[7] = 78; // Side bench Temp #2
+  setPointArray[8] = 72; // Hydro res temp #3
+  //setPointArray[9] = 72; // Hydro Res 1 (NFT Channel) Temp
+  //setPointArray[10] = 72; // Hydro Res 2 (buckets) Temp
 }
 
 void loop() {
@@ -132,6 +132,7 @@ void loop() {
 }
 
 // Read and write DHT readings
+// DHT sensors not used
 void readDHT() {
   data[6] = indoorSensor.readTemperature(true); // Read temp in deg f
   data[7] = indoorSensor.readHumidity(); // Read humidity
@@ -235,7 +236,7 @@ void heat() {
   int pin = 3; // Pin of heat pump
   int set = 7; // Defined heat set point of zone in array
   int var = 2; // Measured temp of heated zone in array
-  for (int i = 2; i <= 5; i++) {
+  for (int i = 2; i <= 4; i++) {
     if (data[var] < setPointArray[set]) { // If measured temp is less than set temp
       pinState[pin] = LOW; // Turn ON heat pump
     }
@@ -253,7 +254,7 @@ void heat() {
 
 // FIX THIS Read all zone temperatures (DS1820B sensor) and write to data array
 /*
-void readZoneTemps() {
+  void readZoneTemps() {
   sensors.requestTemperatures();
   data[1] = sensors.getTempF(t1);
   data[2] = sensors.getTempF(t2);
@@ -268,10 +269,10 @@ void readZoneTemps() {
 void readZoneTemps() {
   sensors.requestTemperatures();
   data[1] = sensors.getTempF(t1);
-  data[2] = sensors.getTempF(t1);
-  data[3] = sensors.getTempF(t1);
-  data[4] = sensors.getTempF(t1);
-  data[5] = sensors.getTempF(t1);
+  data[2] = sensors.getTempF(t2);
+  data[3] = sensors.getTempF(t3);
+  // data[4] = sensors.getTempF(t1);
+  // data[5] = sensors.getTempF(t1);
   data[10] = sensors.getTempF(t6);
   delay(1000);
 
@@ -296,6 +297,7 @@ void writePins() {
 
 
 // FIX THIS CYCLE DUTY COOLING AND HEATING TAKE DIFFERENT DUTY CYCLES
+// HEATING DUTY CYCLE INPUT FOR NOW
 void counter() {
   if (count >= 120) { // program has about 5 seconds of delay in it, turn OFF pump every 'count' program cycles
 
@@ -303,10 +305,10 @@ void counter() {
       digitalWrite(2, HIGH); // Turn OFF reservoir pump
       delay(5000); // Wait 5 seconds
     }
-    if (coolingStage > 0) {
+    if (coolingStage > 2) {
       digitalWrite(13, LOW); // Turn ON misters
       Serial.println("MIST  ON");
-      delay(5000); // Wait 5 seconds
+      delay(10000); // Wait 10 seconds
       digitalWrite(13, HIGH); // Turn OFF misters
       Serial.println("MIST  OFF");
     }
