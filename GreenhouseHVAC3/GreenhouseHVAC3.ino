@@ -21,6 +21,19 @@ DHT greenhouseTempRh(analogPins[0], DHTTYPE); // Ambient temperature pin, DHT11 
 
 void setup() {
   Serial.begin(9600);
+
+  // Setup all analog pins for INPUT
+  for (int i = 0; i <= 4; i++) {
+    pinMode(analogPins[i], INPUT);
+  }
+
+  //Setup OUTPUT pins and initialize is HIGH state (relay OFF)
+  for (int i = 2; i <= 13; i++) {
+    pinMode(i, OUTPUT);
+    pinState[i] = HIGH;
+  }
+  writePins();
+  
   //pinmode(analogPins[0], INPUT); // Change analong pin 0 to input
   greenhouseTempRh.begin(); // begin reading temp and rh
 
@@ -41,11 +54,9 @@ void setup() {
 void loop() {
   readTempRh(greenhouseTempRh);
   delay(1000);
-  setPoint();
   fanSpeed();
   writePins();
   serialOutput();
-  //Serial.println(coolingStage);
 }
 
 DHT readTempRh(DHT sensor) {
@@ -53,13 +64,16 @@ DHT readTempRh(DHT sensor) {
   t = sensor.readTemperature();
   f = sensor.readTemperature(true);
   delay(100); // Wait for reading to settle
+
+   // If temp is nan then turn off HVAC
   if (isnan(h) || isnan(t) || isnan(f)) {
     Serial.println("Failed to read from DHT sensor!");
+    coolingStage = 0;
     return;
   }
 
   temp = f;
-  //Serial.println(temp);
+  
   /*
   Serial.print("Humidity: ");
   Serial.print(h);
@@ -70,31 +84,28 @@ DHT readTempRh(DHT sensor) {
   Serial.print(f);
   Serial.println(" *F\t");
   */
-}
 
-// Set the heating or cooling stage
-int setPoint() {
-  //Serial.println(temp);
-  int var = temp;
+ // If temp is nan then turn off HVAC
+
   //Heat ON
-  if (var <= setPointArray[0]) {
+  if (temp <= setPointArray[0]) {
     coolingStage = -1;
     return;
   }
   // Heat OFF Cool OFF
-  if (var <= setPointArray[1]) {
+  if (temp <= setPointArray[1]) {
     coolingStage = 0;
   }
   // Cool ON Stage 1
-  if (var >= setPointArray[2] && coolingStage < 1) {
+  if (temp >= setPointArray[2] && coolingStage < 1) {
     coolingStage = 1;
   }
   // Cool ON Stage 2
-  if (var >= setPointArray[3] && coolingStage < 2) {
+  if (temp >= setPointArray[3] && coolingStage < 2) {
     coolingStage = 2;
   }
   // Cool ON Stage 3
-  if (var >= setPointArray[4] && coolingStage < 3) {
+  if (temp >= setPointArray[4] && coolingStage < 3) {
     coolingStage = 3;
   }
 }
@@ -152,6 +163,6 @@ void serialOutput() {
   Serial.println(" Degrees F");
   Serial.print(h);
   Serial.println(" % Humidity");
-  Serial.println("Cooling Stage: ");
+  Serial.print("Cooling Stage: ");
   Serial.println(coolingStage);
 }
