@@ -5,6 +5,10 @@
 
 #include "DHT.h" //DHT11 sensor library
 // Adafruit Sensor Library must be installed, DHT.H library is dependent on it, or sketch won't compile!
+
+unsigned long loopMillis = 0; // Time
+int loopTimer = 1000; // milliseconds between measurments
+
 const int analogPins[] = {A0, A1, A2, A3, A4};
 float h;
 float t;
@@ -33,7 +37,7 @@ void setup() {
     pinState[i] = HIGH;
   }
   writePins();
-  
+
   //pinmode(analogPins[0], INPUT); // Change analong pin 0 to input
   greenhouseTempRh.begin(); // begin reading temp and rh
 
@@ -52,20 +56,22 @@ void setup() {
 }
 
 void loop() {
-  readTempRh(greenhouseTempRh);
-  delay(1000);
-  fanSpeed();
-  writePins();
-  serialOutput();
+  if (millis() > loopMillis + loopTimer) {
+    loopMillis = millis();
+    readTempRh(greenhouseTempRh);
+    fanSpeed();
+    writePins();
+    serialOutput();
+  }
+
 }
 
 DHT readTempRh(DHT sensor) {
   h = sensor.readHumidity();
   t = sensor.readTemperature();
   f = sensor.readTemperature(true);
-  delay(100); // Wait for reading to settle
 
-   // If temp is nan then turn off HVAC
+  // If temp is nan then turn off HVAC
   if (isnan(h) || isnan(t) || isnan(f)) {
     Serial.println("Failed to read from DHT sensor!");
     coolingStage = 0;
@@ -73,19 +79,6 @@ DHT readTempRh(DHT sensor) {
   }
 
   temp = f;
-  
-  /*
-  Serial.print("Humidity: ");
-  Serial.print(h);
-  Serial.print(" %\t");
-  Serial.print("Temperature: ");
-  Serial.print(t);
-  Serial.print(" *C ");
-  Serial.print(f);
-  Serial.println(" *F\t");
-  */
-
- // If temp is nan then turn off HVAC
 
   //Heat ON
   if (temp <= setPointArray[0]) {
@@ -150,6 +143,24 @@ void fanSpeed() {
   }
 }
 
+void mistingRelay() {
+  // If temp is nan then turn off HVAC
+  if (isnan(h)) {
+    Serial.println("Failed to read humidity from DHT sensor, cannot activate misters until corrected!");
+    pinState[13] = HIGH;
+    return;
+  }
+  // If humidity is less than 80% and cooling stage is 3 turn ON misters
+  if(h < 80 && coolingStage == 3) {
+    pinState[13] = LOW;
+  }
+  // Else turn OFF misters
+  else {
+    pinState[13] = HIGH;
+  }
+  
+}
+
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
@@ -165,4 +176,6 @@ void serialOutput() {
   Serial.println(" % Humidity");
   Serial.print("Cooling Stage: ");
   Serial.println(coolingStage);
+  Serial.print("Misters: ");
+  Serial.println(pinState[13]);
 }
