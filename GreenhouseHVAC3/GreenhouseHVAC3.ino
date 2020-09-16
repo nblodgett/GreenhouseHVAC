@@ -6,22 +6,21 @@
 #include "DHT.h" //DHT11 sensor library
 // Adafruit Sensor Library must be installed, DHT.H library is dependent on it, or sketch won't compile!
 
-unsigned long loopMillis = 0; // Time
-int loopTimer = 5000; // milliseconds between measurments
-
+unsigned long loopTime = 0; // Loop timer
+int loopInterval = 5000; // ms between loop measurement intervals
+float h; // humidity measurement
+float t; // deg c measurement
+float f; // deg f measurement
+int temp; // temp measurement
+int hLimit = 70; // humidity limit
+int coolingStage; // HVAC cooling stage (-1 through 3)
 const int analogPins[] = {A0, A1, A2, A3, A4};
-float h;
-float t;
-float f;
-int temp;
-int coolingStage;
-int setPointArray[11];
+int setPointArray[11]; // Array of temperature set points
 int pinState[14]; // Array of pin output state
 
 // Init DHT Sensors
 #define DHTTYPE DHT11
 DHT greenhouseTempRh(analogPins[0], DHTTYPE); // Ambient temperature pin, DHT11 sensor
-
 
 void setup() {
   Serial.begin(9600);
@@ -36,9 +35,8 @@ void setup() {
     pinMode(i, OUTPUT);
     pinState[i] = HIGH;
   }
-  writePins();
+  writePins(); // Update pin output states
 
-  //pinmode(analogPins[0], INPUT); // Change analong pin 0 to input
   greenhouseTempRh.begin(); // begin reading temp and rh
 
   // Set heating and cooling temperatures in degrees F
@@ -49,16 +47,15 @@ void setup() {
   setPointArray[4] = 90; // Cooling Stage 3
   setPointArray[5] = 90; // Min Res Temp #1
   setPointArray[6] = 95; // Max Res Temp #1
-  setPointArray[7] = 78; // Side bench Temp #2
-  setPointArray[8] = 72; // Hydro res temp #3
-  //setPointArray[9] = 72; // Hydro Res 1 (NFT Channel) Temp
-  //setPointArray[10] = 72; // Hydro Res 2 (buckets) Temp
+  setPointArray[7] = 72; // NFT Reservoir minimum temp
+  setPointArray[8] = 72; // Benches Minimum temp
+  setPointArray[9] = 72; // 
+  setPointArray[10] = 72; //
 }
 
 void loop() {
-  if(millis() - loopMillis > loopTimer) {
-  //if (millis() > loopMillis + loopTimer) {
-    loopMillis = millis();
+  if(millis() - loopTime > loopInterval) {
+    loopTime = millis();
     readTempRh(greenhouseTempRh);
     fanSpeed();
     mistingRelay();
@@ -92,31 +89,17 @@ DHT readTempRh(DHT sensor) {
     coolingStage = 0;
   }
   // Cool ON Stage 1
-  if (temp >= setPointArray[2]){ // && coolingStage < 1) {
+  if (temp >= setPointArray[2]){
     coolingStage = 1;
   }
   // Cool ON Stage 2
-  if (temp >= setPointArray[3]){ // && coolingStage < 2) {
+  if (temp >= setPointArray[3]){
     coolingStage = 2;
   }
   // Cool ON Stage 3
-  if (temp >= setPointArray[4]){ // && coolingStage < 3) {
+  if (temp >= setPointArray[4]){
     coolingStage = 3;
   }
-  /*
-  // Cool ON Stage 1
-  if (temp >= setPointArray[2] && coolingStage < 1) {
-    coolingStage = 1;
-  }
-  // Cool ON Stage 2
-  if (temp >= setPointArray[3] && coolingStage < 2) {
-    coolingStage = 2;
-  }
-  // Cool ON Stage 3
-  if (temp >= setPointArray[4] && coolingStage < 3) {
-    coolingStage = 3;
-  }
-  */
 }
 
 void fanSpeed() {
@@ -127,35 +110,28 @@ void fanSpeed() {
       pinState[i] = HIGH;
     }
   }
-
-  // SetPoint 1 - Low fan setting - Turn ON evap cooler, water pump and vent
-  if (coolingStage == 1) {
-    pinState[7] = LOW;
-    pinState[8] = LOW;
+  
+  // Anything else start cooling
+  else {
+    pinState[7] = LOW; // Exhaust relay 1
+    pinState[8] = LOW; // Exhause relay 2
     pinState[9] = LOW; // Evaporative cooling water pump relay output
     pinState[10] = HIGH; // Turn OFF HI fan speed
     pinState[11] = HIGH; // Turn OFF MED fan speed
+    pinState[12] = HIGH; // Turn OFF LOW fan speed
+  }
+
+  // SetPoint 1 - Low fan setting
+  if (coolingStage == 1) {
     pinState[12] = LOW; // Turn ON LOW fan speed
   }
-
-  // SetPoint 2 - MED fan setting - Turn ON evap cooler, water pump and vent
+  // SetPoint 2 - MED fan setting
   if (coolingStage == 2) {
-    pinState[7] = LOW;
-    pinState[8] = LOW;
-    pinState[9] = LOW; // Evaporative cooling water pump relay output
-    pinState[10] = HIGH; // Turn OFF HI fan speed
     pinState[11] = LOW; // Turn ON MED fan speed
-    pinState[12] = HIGH; // Turn OFF LOW fan speed
   }
-
-  // SetPoint 3 - HI fan setting - Turn ON evap cooler, water pump and vent
+  // SetPoint 3 - HI fan setting
   if (coolingStage == 3) {
-    pinState[7] = LOW;
-    pinState[8] = LOW;
-    pinState[9] = LOW; // Evaporative cooling water pump relay output
     pinState[10] = LOW; // Turn ON HI fan speed
-    pinState[11] = HIGH; // Turn OFF MED fan speed
-    pinState[12] = HIGH; // Turn OFF LOW fan speed
   }
 }
 
@@ -172,15 +148,15 @@ void mistingRelay() {
     pinState[13] = HIGH;
     return;
   }
-  // If humidity is less than 75% turn  ON misters
-  if(h < 70) {
+  // If humidity is less than the limit turn ON misters
+  if(h < hLimit) {
     pinState[13] = LOW;
-    Serial.println("Misters ON");
+    Serial.println("Misters Turned ON");
   }
-
-  if(h >= 70) {
+  // Else turn OFF misters
+  else {
     pinState[13] = HIGH;
-    Serial.println("Misters OFF");
+    Serial.println("Misters Turned OFF");
   }
 }
 
@@ -199,6 +175,4 @@ void serialOutput() {
   Serial.println(" % Humidity");
   Serial.print("Cooling Stage: ");
   Serial.println(coolingStage);
-  //Serial.print("Misters: ");
-  //Serial.println(pinState[13]);
 }
