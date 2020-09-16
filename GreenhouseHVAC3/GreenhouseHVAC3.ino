@@ -7,7 +7,7 @@
 // Adafruit Sensor Library must be installed, DHT.H library is dependent on it, or sketch won't compile!
 
 unsigned long loopMillis = 0; // Time
-int loopTimer = 1000; // milliseconds between measurments
+int loopTimer = 5000; // milliseconds between measurments
 
 const int analogPins[] = {A0, A1, A2, A3, A4};
 float h;
@@ -42,7 +42,7 @@ void setup() {
   greenhouseTempRh.begin(); // begin reading temp and rh
 
   // Set heating and cooling temperatures in degrees F
-  setPointArray[0] = 60; // Cooling Stage -1
+  setPointArray[0] = 65; // Cooling Stage -1
   setPointArray[1] = 78; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
@@ -56,10 +56,12 @@ void setup() {
 }
 
 void loop() {
-  if (millis() > loopMillis + loopTimer) {
+  if(millis() - loopMillis > loopTimer) {
+  //if (millis() > loopMillis + loopTimer) {
     loopMillis = millis();
     readTempRh(greenhouseTempRh);
     fanSpeed();
+    mistingRelay();
     writePins();
     serialOutput();
   }
@@ -86,9 +88,22 @@ DHT readTempRh(DHT sensor) {
     return;
   }
   // Heat OFF Cool OFF
-  if (temp <= setPointArray[1]) {
+  if (temp > setPointArray[0] || temp < setPointArray[2]) {
     coolingStage = 0;
   }
+  // Cool ON Stage 1
+  if (temp >= setPointArray[2]){ // && coolingStage < 1) {
+    coolingStage = 1;
+  }
+  // Cool ON Stage 2
+  if (temp >= setPointArray[3]){ // && coolingStage < 2) {
+    coolingStage = 2;
+  }
+  // Cool ON Stage 3
+  if (temp >= setPointArray[4]){ // && coolingStage < 3) {
+    coolingStage = 3;
+  }
+  /*
   // Cool ON Stage 1
   if (temp >= setPointArray[2] && coolingStage < 1) {
     coolingStage = 1;
@@ -101,6 +116,7 @@ DHT readTempRh(DHT sensor) {
   if (temp >= setPointArray[4] && coolingStage < 3) {
     coolingStage = 3;
   }
+  */
 }
 
 void fanSpeed() {
@@ -150,15 +166,22 @@ void mistingRelay() {
     pinState[13] = HIGH;
     return;
   }
-  // If humidity is less than 80% and cooling stage is 3 turn ON misters
-  if(h < 80 && coolingStage == 3) {
-    pinState[13] = LOW;
-  }
-  // Else turn OFF misters
-  else {
-    pinState[13] = HIGH;
-  }
   
+  // If cooling stage is less than 3 turn OFF misters
+  if(coolingStage < 3) {
+    pinState[13] = HIGH;
+    return;
+  }
+  // If humidity is less than 75% turn  ON misters
+  if(h < 70) {
+    pinState[13] = LOW;
+    Serial.println("Misters ON");
+  }
+
+  if(h >= 70) {
+    pinState[13] = HIGH;
+    Serial.println("Misters OFF");
+  }
 }
 
 
@@ -176,6 +199,6 @@ void serialOutput() {
   Serial.println(" % Humidity");
   Serial.print("Cooling Stage: ");
   Serial.println(coolingStage);
-  Serial.print("Misters: ");
-  Serial.println(pinState[13]);
+  //Serial.print("Misters: ");
+  //Serial.println(pinState[13]);
 }
