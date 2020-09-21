@@ -120,14 +120,16 @@ void fanSpeed() {
     pinState[11] = HIGH; // Turn OFF MED fan speed
     pinState[12] = HIGH; // Turn OFF LOW fan speed
   }
-
+  // Changed to turn fan on HI on all setttings to avoid issues starting fan at lower speed
   // SetPoint 1 - Low fan setting
   if (coolingStage == 1) {
-    pinState[12] = LOW; // Turn ON LOW fan speed
+    //pinState[12] = LOW; // Turn ON LOW fan speed
+    pinState[10] = LOW; // Turn ON HI fan speed
   }
   // SetPoint 2 - MED fan setting
   if (coolingStage == 2) {
-    pinState[11] = LOW; // Turn ON MED fan speed
+    //pinState[11] = LOW; // Turn ON MED fan speed
+    pinState[10] = LOW; // Turn ON HI fan speed
   }
   // SetPoint 3 - HI fan setting
   if (coolingStage == 3) {
