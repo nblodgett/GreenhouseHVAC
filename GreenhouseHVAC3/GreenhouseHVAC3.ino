@@ -12,7 +12,8 @@ float h; // humidity measurement
 float t; // deg c measurement
 float f; // deg f measurement
 int temp; // temp measurement
-int hLimit = 70; // humidity limit
+int hMin = 55; // humidity minimum for misters
+int hMax = 60; // humidity maximum for misters
 int coolingStage; // HVAC cooling stage (-1 through 3)
 const int analogPins[] = {A0, A1, A2, A3, A4};
 int setPointArray[11]; // Array of temperature set points
@@ -151,14 +152,16 @@ void mistingRelay() {
     return;
   }
   // If humidity is less than the limit turn ON misters
-  if(h < hLimit) {
+  if(h <= hMin) {
     pinState[13] = LOW;
     Serial.println("Misters Turned ON");
+    return;
   }
-  // Else turn OFF misters
-  else {
+  // If humidity is over the max turn OFF misters
+  if(h >= hMax) {
     pinState[13] = HIGH;
     Serial.println("Misters Turned OFF");
+    return;
   }
 }
 
