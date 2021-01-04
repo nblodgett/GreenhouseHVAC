@@ -6,6 +6,9 @@
 #include "OneWire.h" // Library needed for DS18B20 sensors
 #include "DallasTemperature.h" // Library needed for DS18B20 sensors
 
+//Setup serial input checking
+int incomingByte = 0; // for incoming serial data
+
 //DHT Setup
 unsigned long loopTime = 0; // Loop timer
 int loopInterval = 5000; // ms between loop measurement intervals
@@ -74,19 +77,28 @@ void setup() {
 
 void loop()
 {
+  // If any serial data is sent by computer, reprint headings
+  if (Serial.available() > 0) {
+    // read the incoming byte:
+    incomingByte = Serial.read();
+    if(incomingByte == 10) {
+      printHeadings();
+    }
+  }
+
+  // Sensor measurements
   if (millis() - loopTime > loopInterval) {
     loopTime = millis();
     //DHT Sensor reading and writing to array
     for (int i = 0; i < 4; i++) {
       dhtData[i][0] = dht[i].readTemperature(true);
       dhtData[i][1] = dht[i].readHumidity();
-
       Serial.print(dhtData[i][0]);
       Serial.print(", ");
       Serial.print(dhtData[i][1]);
       Serial.print(", ");
     }
-    
+ 
   // DS18B20 Sensor reading and writing to array
     sensors.requestTemperatures();
     Serial.print(",");
@@ -95,7 +107,6 @@ void loop()
       Serial.print(oneWireData[i]);
       Serial.print(",");
     }
-    
     Serial.println("");
   }
 }
@@ -112,6 +123,5 @@ void printHeadings() {
   for (int i = 0; i < 7; i++) {
     Serial.print(oneWireDesc[i]);
   }
-
   Serial.println();
 }
