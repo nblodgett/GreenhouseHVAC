@@ -8,10 +8,13 @@
 
 //Setup serial input checking
 int incomingByte = 0; // for incoming serial data
+unsigned long tempTime = 0; // millis - heaterTime
+unsigned long heaterTime = 0; //Heater cooldown timer
+int heatOn = 6000; // ms heater is on 600000
+int heatCooldown = 7000; // ms heater cools down, to avoid shutoff 660000
 
-//DHT Setup
 unsigned long loopTime = 0; // Loop timer
-int loopInterval = 5000; // ms between loop measurement intervals
+int loopInterval = 1000; // ms between loop measurement intervals
 int dhtData[4][2]; // Temp and humidity data from sensors
 String dhtDataDesc[4][2] = { {"Enclosure Temperature,", "Enclosure Humidity,"},
   {"Greenhouse Temperature,", "Greenhouse Humidity,"},
@@ -118,6 +121,13 @@ void loop()
     mistingRelay();
     setHeat();
     writePins();
+
+    // Checking pin states
+    for (int i = 0; i < 16; i++)
+    {
+      Serial.print(pinState[i]);
+    }
+    Serial.println();
   }
 }
 
@@ -211,13 +221,15 @@ int setCoolingStage(int dhtTemp, int dsTemp) {
   if (temp >= setPointArray[4]) {
     coolingStage = 3;
   }
+  Serial.print("CoolingStage: ");
+  Serial.println(coolingStage);
 };
 
 void fanSpeed() {
   // Set Point 0 - No heating or cooling - Turn OFF evap cooler, water pump, and vent
   if (coolingStage <= 0) {
     // Turn OFF fans, water pump, and close vents
-    for (int i = 3; i <= 8; i++) {
+    for (int i = 2; i <= 8; i++) {
       pinState[i] = HIGH;
     }
   }
@@ -230,21 +242,27 @@ void fanSpeed() {
     pinState[5] = HIGH; // Turn OFF HI fan speed
     pinState[4] = HIGH; // Turn OFF MED fan speed
     pinState[3] = HIGH; // Turn OFF LOW fan speed
+    pinState[2] = HIGH; // Turn OFF HI Intake Fan
   }
   // Changed to turn fan on HI on all setttings to avoid issues starting fan at lower speed
   // SetPoint 1 - Low fan setting
   if (coolingStage == 1) {
     //pinState[3] = LOW; // Turn ON LOW fan speed
     pinState[5] = LOW; // Turn ON HI fan speed
+    Serial.println("Evap Cooler Low");
   }
   // SetPoint 2 - MED fan setting
   if (coolingStage == 2) {
     //pinState[4] = LOW; // Turn ON MED fan speed
     pinState[5] = LOW; // Turn ON HI fan speed
+    Serial.println("Evap Cooler Med");
   }
   // SetPoint 3 - HI fan setting
   if (coolingStage == 3) {
     pinState[5] = LOW; // Turn ON HI fan speed
+    pinState[2] = LOW; // Turn ON HI Intake Fan
+    Serial.println("Evap Cooler Hi");
+
   }
 }
 
@@ -263,6 +281,7 @@ void mistingRelay() {
   // If cooling stage is less than 3 turn OFF misters
   if (coolingStage < 3) {
     pinState[1] = HIGH;
+    //Serial.println(" ");
     return;
   }
   // If humidity is less than the limit turn ON misters
@@ -282,15 +301,30 @@ void mistingRelay() {
 
 // Set heat ON/OFF for each of the 6 heat zones with corresponding DS18B20 sensors
 void setHeat() {
+
+  if (coolingStage > -1) {
+    heaterTime = millis(); // Reset heat timer since no longer heating
+    Serial.println("Heat mode not enabled, heater timer reset");
+    for (int i = 9; i <= 15; i++) { // Cycle through and turn off all heat pumps and actuators
+      pinState[i] = HIGH;
+      return; // Exit out of function without turning on any heat
+    }
+  }
+  // ms since heat reset
+  tempTime = millis() - heaterTime;
+
+  // Reset timer after heafOff cooldown timer
+  if (tempTime > heatCooldown) {
+    heaterTime = millis();
+    Serial.println("RESET heat Timer");
+  }
+
   for (int i = 0; i <= 6; i++) {
     int temp = oneWireData[i][0]; // Temp
     int heat = oneWireData[i][1]; // Heat ON/OFF
     int maxTemp = heatArr[i][0]; // Max Temp
     int minTemp = heatArr[i][1]; // Min Temp
 
-    if (coolingStage > -1) {
-      heat = HIGH;
-    }
     if (temp > maxTemp) {
       heat = HIGH; // Turn OFF heat
     }
@@ -303,16 +337,16 @@ void setHeat() {
     }
   }
 
-  int reservoir = oneWireData[1][1];
-  int radiator = oneWireData[2][1];
+  int reservoir = oneWireData[1][1]; // reservior actuator ON/OFF setting
+  int radiator = oneWireData[2][1]; // radiator actuator ON/OFF setting
   // If reservoir needs to be heated turn off radiator and actuator
   if (reservoir  == LOW) {
     radiator = HIGH;
   }
 
-  // Turn on heat circ pump for reservior or radiator
+  // Turn on heat pump for reservior or radiator
   if (reservoir == LOW || radiator == LOW) {
-    pinState[9] = LOW; // Turn on circ pump
+    pinState[9] = LOW; // Turn on heater pump
     // Heat reservoir
     if (reservoir == LOW) {
       pinState[14] = LOW; // Turn ON reservoir actuator
@@ -320,9 +354,19 @@ void setHeat() {
     }
     // Heat radiator
     if (radiator == LOW) {
-      pinState[14] = HIGH; // Turn OF reservoir actuator
+      pinState[14] = HIGH; // Turn OFF reservoir actuator
       pinState[15] = LOW; // Turn ON radiator actuator
     }
+  }
+
+  // HEATER COOLDOWN TIMER
+  // If heater is in cooldown turn off heater pump
+  if (tempTime >= heatOn && tempTime <= heatCooldown) {
+    pinState[9] = HIGH;
+    Serial.println("Cooldown, Heat Pump OFF");
+  }
+  else if (pinState[9] == LOW) {
+    Serial.println("Heat Pump ON");
   }
 
   // Cycle through bench temps and turn on circ pump and actuator when needed
@@ -333,7 +377,7 @@ void setHeat() {
     int pin = i + 8; // Actuator pins are 11-13
     if (heatSetting == LOW) {
       pinState[pin] = LOW; // Actuator ON
-      pinState[10] = HIGH; // Circ pump ON if at least one actuator is on
+      pinState[10] = LOW; // Circ pump ON if at least one actuator is on
     }
   }
 }
