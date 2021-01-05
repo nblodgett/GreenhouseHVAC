@@ -105,6 +105,7 @@ void loop()
     //Pass both greenhouse temp readings to set cooling stage func
     setCoolingStage(dhtData[1][0], oneWireData[0]);
     fanSpeed();
+    mistingRelay();
     writePins();
   }
 }
@@ -235,6 +236,39 @@ void fanSpeed() {
     pinState[5] = LOW; // Turn ON HI fan speed
   }
 }
+
+void mistingRelay() {
+  int h = dhtData[1][1];
+  int hMin = setPointArray[10];
+  int hMax = setPointArray[11];
+  
+  // If temp is nan then turn off HVAC
+  if (h == 0) {
+    Serial.println("Failed to read humidity from DHT sensor, cannot activate misters until corrected!");
+    pinState[1] = HIGH;
+    return;
+  }
+  
+  // If cooling stage is less than 3 turn OFF misters
+  if(coolingStage < 3) {
+    pinState[1] = HIGH;
+    return;
+  }
+  // If humidity is less than the limit turn ON misters
+  if(h <= hMin) {
+    pinState[1] = LOW;
+    Serial.println("Misters Turned ON");
+    return;
+  }
+  // If humidity is over the max turn OFF misters
+  if(h >= hMax) {
+    pinState[1] = HIGH;
+    Serial.println("Misters Turned OFF");
+    return;
+  }
+}
+
+
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
