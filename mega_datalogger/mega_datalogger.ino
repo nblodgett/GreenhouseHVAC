@@ -61,6 +61,25 @@ String oneWireDesc[7] = {
   "Bench 3 Temperature,"
 };
 
+int coolingStage = 0; // Current cooling stage
+int pinState[16]; // Array of pin output states corresponds with pins 31-46
+
+// Set heating and cooling temperatures in degrees F
+int setPointArray[12];
+/*
+  setPointArray[0] = 65; // Cooling Stage -1
+  setPointArray[1] = 78; // Cooling Stage 0
+  setPointArray[2] = 80; // Cooling Stage 1
+  setPointArray[3] = 85; // Cooling Stage 2
+  setPointArray[4] = 90; // Cooling Stage 3
+  setPointArray[5] = 90; // Min Res Temp #1
+  setPointArray[6] = 95; // Max Res Temp #1
+  setPointArray[7] = 72; // NFT Reservoir minimum temp
+  setPointArray[8] = 72; // Benches Minimum temp
+  setPointArray[9] = 72; //
+  setPointArray[10] = 72; //
+*/
+
 void setup() {
   Serial.begin(9600);
   //Setup DHT Sensors
@@ -73,41 +92,63 @@ void setup() {
   sensors.begin();
 
   printHeadings();
+
+
+  setPointArray[0] = 65; // Cooling Stage -1
+  setPointArray[1] = 78; // Cooling Stage 0
+  setPointArray[2] = 80; // Cooling Stage 1
+  setPointArray[3] = 85; // Cooling Stage 2
+  setPointArray[4] = 90; // Cooling Stage 3
+  setPointArray[5] = 90; // Min Res Temp
+  setPointArray[6] = 95; // Max Res Temp
+  setPointArray[7] = 72; // Bench 1 Temp
+  setPointArray[8] = 72; // Bench 2 Temp
+  setPointArray[9] = 72; // Bench 3 Temp
+  setPointArray[10] = 55; // Humidity Min
+  setPointArray[11] = 60; // Humidity Max
+
 }
 
 void loop()
 {
-  // If any serial data is sent by computer, reprint headings
-  if (Serial.available() > 0) {
-    // read the incoming byte:
-    incomingByte = Serial.read();
-    if(incomingByte == 10) {
-      printHeadings();
-    }
-  }
 
+  checkSerialInput();
+  
   // Sensor measurements
   if (millis() - loopTime > loopInterval) {
     loopTime = millis();
-    //DHT Sensor reading and writing to array
+    //Loop through each DHT22 sensor
     for (int i = 0; i < 4; i++) {
+      //Read each DHT Sensor temp and humidity and write to array
       dhtData[i][0] = dht[i].readTemperature(true);
       dhtData[i][1] = dht[i].readHumidity();
+      // Print temp and humidity to serial
       Serial.print(dhtData[i][0]);
       Serial.print(", ");
       Serial.print(dhtData[i][1]);
       Serial.print(", ");
     }
- 
-  // DS18B20 Sensor reading and writing to array
+
+    // DS18B20 Sensor reading
     sensors.requestTemperatures();
     Serial.print(",");
+    // Loop through all DS18B20 sensors
     for (int i = 0; i < 7; i++) {
+      // Get temps and write to array
       oneWireData[i] = sensors.getTempF(oneWireAddress[i]);
+      // Print temps to serial
       Serial.print(oneWireData[i]);
       Serial.print(",");
     }
     Serial.println("");
+
+    //Pass both greenhouse temp readings to set cooling stage func
+    setCoolingStage(dhtData[1][0], oneWireData[0]);
+    
+    Serial.println(coolingStage); // Temporary cooling stage check
+    
+    fanSpeed();
+    writePins();
   }
 }
 
@@ -124,4 +165,97 @@ void printHeadings() {
     Serial.print(oneWireDesc[i]);
   }
   Serial.println();
+}
+
+void checkSerialInput() {
+    // If any serial data is sent by computer, reprint headings
+  if (Serial.available() > 0) {
+    // read the incoming byte:
+    incomingByte = Serial.read();
+    if (incomingByte == 10) {
+      printHeadings();
+    }
+  }
+}
+
+int setCoolingStage(int dhtTemp, int dsTemp) {
+  // Error checking data, turn off greenhouse if both temperatures are errors
+  int temp;
+  if (dhtTemp == 0 && dsTemp == -196) {
+    coolingStage = 0;
+    return;
+  }
+  // If DHT22 temp is 0, use DS18B20 temperature incase it is an error
+  if (dhtTemp == 0) {
+    temp = dsTemp;
+  }
+  // Use DHT22 temperature for all other cases
+  else temp = dhtTemp;
+
+  Serial.println(temp); // Temporary check temp is correct
+  
+  //Heat ON
+  if (temp <= setPointArray[0]) {
+    coolingStage = -1;
+    return;
+  }
+  // Heat OFF Cool OFF
+  if (temp > setPointArray[0] || temp < setPointArray[2]) {
+    coolingStage = 0;
+  }
+  // Cool ON Stage 1
+  if (temp >= setPointArray[2]) {
+    coolingStage = 1;
+  }
+  // Cool ON Stage 2
+  if (temp >= setPointArray[3]) {
+    coolingStage = 2;
+  }
+  // Cool ON Stage 3
+  if (temp >= setPointArray[4]) {
+    coolingStage = 3;
+  }
+};
+
+void fanSpeed() {
+  // Set Point 0 - No heating or cooling - Turn OFF evap cooler, water pump, and vent
+  if (coolingStage <= 0) {
+    // Turn OFF fans, water pump, and close vents
+    for (int i = 3; i <= 8; i++) {
+      pinState[i] = HIGH;
+    }
+  }
+
+  // Anything else start cooling
+  else {
+    pinState[8] = LOW; // Exhaust relay 2 ON
+    pinState[7] = LOW; // Exhause relay 1 ON
+    pinState[6] = LOW; // Evaporative cooling water pump ON
+    pinState[5] = HIGH; // Turn OFF HI fan speed
+    pinState[4] = HIGH; // Turn OFF MED fan speed
+    pinState[3] = HIGH; // Turn OFF LOW fan speed
+  }
+  // Changed to turn fan on HI on all setttings to avoid issues starting fan at lower speed
+  // SetPoint 1 - Low fan setting
+  if (coolingStage == 1) {
+    //pinState[3] = LOW; // Turn ON LOW fan speed
+    pinState[5] = LOW; // Turn ON HI fan speed
+  }
+  // SetPoint 2 - MED fan setting
+  if (coolingStage == 2) {
+    //pinState[4] = LOW; // Turn ON MED fan speed
+    pinState[5] = LOW; // Turn ON HI fan speed
+  }
+  // SetPoint 3 - HI fan setting
+  if (coolingStage == 3) {
+    pinState[5] = LOW; // Turn ON HI fan speed
+  }
+}
+
+// Write all the pin states on OUTPUT pins
+void writePins() {
+  for (int i = 0; i <= 15; i++) {
+    int pinLocation = i + 31; // Pin location corresponds to 31-46
+    digitalWrite(pinLocation, pinState[i]);
+  }
 }
