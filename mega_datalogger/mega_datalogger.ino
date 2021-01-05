@@ -40,12 +40,12 @@ DallasTemperature sensors(&oneWire);
 uint8_t oneWireAddress[7][8] = {
   { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 Greenhouse Temperature
   { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Ambient Temperature
-  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6
-  { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 defective
+  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 Reservoir
+  { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 Radiator
   // { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }, // #4 defective
-  { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }, // #3
-  { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }, // #2
-  { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }, // #1
+  { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }, // #3 Bench 1
+  { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }, // #2 Bench 2
+  { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }, // #1 Bench 3
 };
 
 // Temperature Data from DS18B20 sensors
@@ -66,19 +66,7 @@ int pinState[16]; // Array of pin output states corresponds with pins 31-46
 
 // Set heating and cooling temperatures in degrees F
 int setPointArray[12];
-/*
-  setPointArray[0] = 65; // Cooling Stage -1
-  setPointArray[1] = 78; // Cooling Stage 0
-  setPointArray[2] = 80; // Cooling Stage 1
-  setPointArray[3] = 85; // Cooling Stage 2
-  setPointArray[4] = 90; // Cooling Stage 3
-  setPointArray[5] = 90; // Min Res Temp #1
-  setPointArray[6] = 95; // Max Res Temp #1
-  setPointArray[7] = 72; // NFT Reservoir minimum temp
-  setPointArray[8] = 72; // Benches Minimum temp
-  setPointArray[9] = 72; //
-  setPointArray[10] = 72; //
-*/
+
 
 void setup() {
   Serial.begin(9600);
@@ -90,9 +78,6 @@ void setup() {
   pinMode(9, INPUT);
   //DS18B20 Sensor Setup
   sensors.begin();
-
-  printHeadings();
-
 
   setPointArray[0] = 65; // Cooling Stage -1
   setPointArray[1] = 78; // Cooling Stage 0
@@ -107,46 +92,18 @@ void setup() {
   setPointArray[10] = 55; // Humidity Min
   setPointArray[11] = 60; // Humidity Max
 
+  printHeadings();
 }
 
 void loop()
 {
-
   checkSerialInput();
-  
   // Sensor measurements
   if (millis() - loopTime > loopInterval) {
     loopTime = millis();
-    //Loop through each DHT22 sensor
-    for (int i = 0; i < 4; i++) {
-      //Read each DHT Sensor temp and humidity and write to array
-      dhtData[i][0] = dht[i].readTemperature(true);
-      dhtData[i][1] = dht[i].readHumidity();
-      // Print temp and humidity to serial
-      Serial.print(dhtData[i][0]);
-      Serial.print(", ");
-      Serial.print(dhtData[i][1]);
-      Serial.print(", ");
-    }
-
-    // DS18B20 Sensor reading
-    sensors.requestTemperatures();
-    Serial.print(",");
-    // Loop through all DS18B20 sensors
-    for (int i = 0; i < 7; i++) {
-      // Get temps and write to array
-      oneWireData[i] = sensors.getTempF(oneWireAddress[i]);
-      // Print temps to serial
-      Serial.print(oneWireData[i]);
-      Serial.print(",");
-    }
-    Serial.println("");
-
+    measureTemps();
     //Pass both greenhouse temp readings to set cooling stage func
     setCoolingStage(dhtData[1][0], oneWireData[0]);
-    
-    Serial.println(coolingStage); // Temporary cooling stage check
-    
     fanSpeed();
     writePins();
   }
@@ -168,7 +125,7 @@ void printHeadings() {
 }
 
 void checkSerialInput() {
-    // If any serial data is sent by computer, reprint headings
+  // If any serial data is sent by computer, reprint headings
   if (Serial.available() > 0) {
     // read the incoming byte:
     incomingByte = Serial.read();
@@ -177,6 +134,33 @@ void checkSerialInput() {
     }
   }
 }
+
+void measureTemps() {
+  //Loop through each DHT22 sensor
+  for (int i = 0; i < 4; i++) {
+    //Read each DHT Sensor temp and humidity and write to array
+    dhtData[i][0] = dht[i].readTemperature(true);
+    dhtData[i][1] = dht[i].readHumidity();
+    // Print temp and humidity to serial
+    Serial.print(dhtData[i][0]);
+    Serial.print(", ");
+    Serial.print(dhtData[i][1]);
+    Serial.print(", ");
+  }
+  // DS18B20 Sensor reading
+  sensors.requestTemperatures();
+  Serial.print(",");
+  // Loop through all DS18B20 sensors
+  for (int i = 0; i < 7; i++) {
+    // Get temps and write to array
+    oneWireData[i] = sensors.getTempF(oneWireAddress[i]);
+    // Print temps to serial
+    Serial.print(oneWireData[i]);
+    Serial.print(",");
+  }
+  Serial.println("");
+}
+
 
 int setCoolingStage(int dhtTemp, int dsTemp) {
   // Error checking data, turn off greenhouse if both temperatures are errors
@@ -193,7 +177,7 @@ int setCoolingStage(int dhtTemp, int dsTemp) {
   else temp = dhtTemp;
 
   Serial.println(temp); // Temporary check temp is correct
-  
+
   //Heat ON
   if (temp <= setPointArray[0]) {
     coolingStage = -1;
