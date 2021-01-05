@@ -19,6 +19,15 @@ String dhtDataDesc[4][2] = { {"Enclosure Temperature,", "Enclosure Humidity,"},
   {"Cooling Output Temp,", "Cooling Output Humidity, "}
 };
 
+int heatArr[6][2] = {
+  {55, 60}, // Greenhouse Temps
+  {90, 100}, // reservoir Temps
+  {130, 140}, // Radiator Temps
+  {78, 80}, // Bench #1 Temps
+  {78, 80}, // Bench #2 Temps
+  {78, 80}, // Bench #3 Temps
+};
+
 #define enclosureDHT22 22
 #define greenhouseDHT22 23
 #define ambientDHT22 24
@@ -37,23 +46,29 @@ OneWire oneWire(30);
 DallasTemperature sensors(&oneWire);
 
 // DS18B20 Sensor Addresses
-uint8_t oneWireAddress[7][8] = {
+uint8_t oneWireAddress[6][8] = {
   { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 Greenhouse Temperature
-  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Ambient Temperature
-  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 Reservoir
-  { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 Radiator
+  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Reservoir
+  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 Radiator
+  // { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 Defective?
   // { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }, // #4 defective
   { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }, // #3 Bench 1
   { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }, // #2 Bench 2
   { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }, // #1 Bench 3
 };
 
-// Temperature Data from DS18B20 sensors
-int oneWireData[7];
+// Temperature Data from DS18B20 sensors, heat ON/OFF LOW/HIGH
+int oneWireData[6][2] = {
+  {0, HIGH}, // Greenhouse
+  {0, HIGH}, // Reservoir
+  {0, HIGH}, // Radiator
+  {0, HIGH}, // Bench 1
+  {0, HIGH}, // Bench 2
+  {0, HIGH}, // Bench 3
+};
 
-String oneWireDesc[7] = {
+String oneWireDesc[6] = {
   "Greenhouse Temperature,",
-  "Ambient Temperature,",
   "Reservoir Temperature,",
   "Radiator Temperature,",
   "Bench 1 Temperature,",
@@ -84,13 +99,8 @@ void setup() {
   setPointArray[2] = 80; // Cooling Stage 1
   setPointArray[3] = 85; // Cooling Stage 2
   setPointArray[4] = 90; // Cooling Stage 3
-  setPointArray[5] = 90; // Min Res Temp
-  setPointArray[6] = 95; // Max Res Temp
-  setPointArray[7] = 72; // Bench 1 Temp
-  setPointArray[8] = 72; // Bench 2 Temp
-  setPointArray[9] = 72; // Bench 3 Temp
-  setPointArray[10] = 55; // Humidity Min
-  setPointArray[11] = 60; // Humidity Max
+  setPointArray[5] = 55; // Humidity Min
+  setPointArray[6] = 60; // Humidity Max
 
   printHeadings();
 }
@@ -106,6 +116,7 @@ void loop()
     setCoolingStage(dhtData[1][0], oneWireData[0]);
     fanSpeed();
     mistingRelay();
+    setHeat();
     writePins();
   }
 }
@@ -154,9 +165,9 @@ void measureTemps() {
   // Loop through all DS18B20 sensors
   for (int i = 0; i < 7; i++) {
     // Get temps and write to array
-    oneWireData[i] = sensors.getTempF(oneWireAddress[i]);
+    oneWireData[i][0] = sensors.getTempF(oneWireAddress[i]);
     // Print temps to serial
-    Serial.print(oneWireData[i]);
+    Serial.print(oneWireData[i][0]);
     Serial.print(",");
   }
   Serial.println("");
@@ -239,29 +250,29 @@ void fanSpeed() {
 
 void mistingRelay() {
   int h = dhtData[1][1];
-  int hMin = setPointArray[10];
-  int hMax = setPointArray[11];
-  
+  int hMin = setPointArray[5];
+  int hMax = setPointArray[6];
+
   // If temp is nan then turn off HVAC
   if (h == 0) {
     Serial.println("Failed to read humidity from DHT sensor, cannot activate misters until corrected!");
     pinState[1] = HIGH;
     return;
   }
-  
+
   // If cooling stage is less than 3 turn OFF misters
-  if(coolingStage < 3) {
+  if (coolingStage < 3) {
     pinState[1] = HIGH;
     return;
   }
   // If humidity is less than the limit turn ON misters
-  if(h <= hMin) {
+  if (h <= hMin) {
     pinState[1] = LOW;
     Serial.println("Misters Turned ON");
     return;
   }
   // If humidity is over the max turn OFF misters
-  if(h >= hMax) {
+  if (h >= hMax) {
     pinState[1] = HIGH;
     Serial.println("Misters Turned OFF");
     return;
@@ -269,6 +280,63 @@ void mistingRelay() {
 }
 
 
+// Set heat ON/OFF for each of the 6 heat zones with corresponding DS18B20 sensors
+void setHeat() {
+  for (int i = 0; i <= 6; i++) {
+    int temp = oneWireData[i][0]; // Temp
+    int heat = oneWireData[i][1]; // Heat ON/OFF
+    int maxTemp = heatArr[i][0]; // Max Temp
+    int minTemp = heatArr[i][1]; // Min Temp
+
+    if (coolingStage > -1) {
+      heat = HIGH;
+    }
+    if (temp > maxTemp) {
+      heat = HIGH; // Turn OFF heat
+    }
+    if (temp < minTemp) {
+      heat = LOW; // Turn ON heat
+    }
+    // Error checking, turn OFF heat if DS18B20 errors
+    if (temp < -195) {
+      heat = HIGH;
+    }
+  }
+
+  int reservoir = oneWireData[1][1];
+  int radiator = oneWireData[2][1];
+  // If reservoir needs to be heated turn off radiator and actuator
+  if (reservoir  == LOW) {
+    radiator = HIGH;
+  }
+
+  // Turn on heat circ pump for reservior or radiator
+  if (reservoir == LOW || radiator == LOW) {
+    pinState[9] = LOW; // Turn on circ pump
+    // Heat reservoir
+    if (reservoir == LOW) {
+      pinState[14] = LOW; // Turn ON reservoir actuator
+      pinState[15] = HIGH; // Turn OFF radiator actuator
+    }
+    // Heat radiator
+    if (radiator == LOW) {
+      pinState[14] = HIGH; // Turn OF reservoir actuator
+      pinState[15] = LOW; // Turn ON radiator actuator
+    }
+  }
+
+  // Cycle through bench temps and turn on circ pump and actuator when needed
+  pinState[10] = HIGH; // Initially turn OFF circ pump, turn ON with actuators
+  for (int i = 3; i < 6; i++) {
+    int temp = oneWireData[i][0];
+    int heatSetting = oneWireData[i][1];
+    int pin = i + 8; // Actuator pins are 11-13
+    if (heatSetting == LOW) {
+      pinState[pin] = LOW; // Actuator ON
+      pinState[10] = HIGH; // Circ pump ON if at least one actuator is on
+    }
+  }
+}
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
