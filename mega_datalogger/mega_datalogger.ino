@@ -14,7 +14,7 @@ int heatOn = 6000; // ms heater is on 600000
 int heatCooldown = 7000; // ms heater cools down, to avoid shutoff 660000
 
 unsigned long loopTime = 0; // Loop timer
-int loopInterval = 1000; // ms between loop measurement intervals
+int loopInterval = 5000; // ms between loop measurement intervals
 int dhtData[4][2]; // Temp and humidity data from sensors
 String dhtDataDesc[4][2] = { {"Enclosure Temperature,", "Enclosure Humidity,"},
   {"Greenhouse Temperature,", "Greenhouse Humidity,"},
@@ -50,8 +50,9 @@ DallasTemperature sensors(&oneWire);
 
 // DS18B20 Sensor Addresses
 uint8_t oneWireAddress[6][8] = {
-  { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 Greenhouse Temperature
-  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Reservoir
+  //{ 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Greenhouse
+  { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 Reservoir
+  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Greenhouse
   { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 Radiator
   // { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 Defective?
   // { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }, // #4 defective
@@ -97,6 +98,12 @@ void setup() {
   //DS18B20 Sensor Setup
   sensors.begin();
 
+  //Setup OUTPUT pins and initialize is HIGH state (relay OFF)
+  for (int i = 0; i < 16; i++) {
+    pinState[i] = HIGH;
+  }
+  writePins();
+
   setPointArray[0] = 65; // Cooling Stage -1
   setPointArray[1] = 78; // Cooling Stage 0
   setPointArray[2] = 80; // Cooling Stage 1
@@ -115,8 +122,7 @@ void loop()
   if (millis() - loopTime > loopInterval) {
     loopTime = millis();
     measureTemps();
-    //Pass both greenhouse temp readings to set cooling stage func
-    setCoolingStage(dhtData[1][0], oneWireData[0]);
+    setCoolingStage();
     fanSpeed();
     mistingRelay();
     setHeat();
@@ -184,19 +190,23 @@ void measureTemps() {
 }
 
 
-int setCoolingStage(int dhtTemp, int dsTemp) {
+void setCoolingStage() {
+  int dhtTemp = dhtData[1][0];
+  int dsTemp = oneWireData[0];
   // Error checking data, turn off greenhouse if both temperatures are errors
-  int temp;
-  if (dhtTemp == 0 && dsTemp == -196) {
-    coolingStage = 0;
-    return;
+  int temp = 999;
+
+  if (dhtTemp > -50 && dhtTemp < 200) {
+    temp = dhtTemp;
   }
-  // If DHT22 temp is 0, use DS18B20 temperature incase it is an error
-  if (dhtTemp == 0) {
+  else if (dsTemp > -50 && dsTemp < 200) {
     temp = dsTemp;
   }
-  // Use DHT22 temperature for all other cases
-  else temp = dhtTemp;
+  else {
+    coolingStage = 0;
+    Serial.println("Both greenhouse sensors out of range; abort setting heat/cool stage");
+    return;
+  }
 
   Serial.println(temp); // Temporary check temp is correct
 
@@ -271,10 +281,9 @@ void mistingRelay() {
   int hMin = setPointArray[5];
   int hMax = setPointArray[6];
 
-  // If temp is nan then turn off HVAC
-  if (h == 0) {
-    Serial.println("Failed to read humidity from DHT sensor, cannot activate misters until corrected!");
-    pinState[1] = HIGH;
+  if (h <= 0 || h > 100) {
+    pinState[1] = HIGH; // Turn OFF misters
+    Serial.println("Humidity data out of range; aborting mist function");
     return;
   }
 
@@ -332,7 +341,9 @@ void setHeat() {
       heat = LOW; // Turn ON heat
     }
     // Error checking, turn OFF heat if DS18B20 errors
-    if (temp < -195) {
+    if (temp < -50 || temp > 200) {
+      Serial.println("Abort heating, temp out of range on DS18b20 array position: ");
+      Serial.println(i);
       heat = HIGH;
     }
   }
@@ -371,6 +382,7 @@ void setHeat() {
 
   // Cycle through bench temps and turn on circ pump and actuator when needed
   pinState[10] = HIGH; // Initially turn OFF circ pump, turn ON with actuators
+  
   for (int i = 3; i < 6; i++) {
     int temp = oneWireData[i][0];
     int heatSetting = oneWireData[i][1];
@@ -384,8 +396,8 @@ void setHeat() {
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
-  for (int i = 0; i <= 15; i++) {
-    int pinLocation = i + 31; // Pin location corresponds to 31-46
+  for (int i = 1; i <= 16; i++) {
+    int pinLocation = i + 30; // Pin location corresponds to 31-46
     digitalWrite(pinLocation, pinState[i]);
   }
 }
