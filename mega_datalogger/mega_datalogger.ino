@@ -15,14 +15,19 @@ int heatCooldown = 7000; // ms heater cools down, to avoid shutoff 660000
 
 unsigned long loopTime = 0; // Loop timer
 int loopInterval = 5000; // ms between loop measurement intervals
-int dhtData[4][2]; // Temp and humidity data from sensors
-String dhtDataDesc[4][2] = { {"Enclosure Temperature,", "Enclosure Humidity,"},
+int dhtData[3][2]; // Temp and humidity data from sensors
+
+//String dhtDataDesc[3][2] = {
+String dhtDataDesc [3][2] = {
+  {"Enclosure Temperature,", "Enclosure Humidity,"},
   {"Greenhouse Temperature,", "Greenhouse Humidity,"},
   {"Ambient Temperature,", "Ambient Humidity,"},
-  {"Cooling Output Temp,", "Cooling Output Humidity, "}
+  //{"Cooling Output Temp,", "Cooling Output Humidity, "}
 };
 
-int heatArr[6][2] = {
+//int heatArr[7][2] = {
+int heatArr[7][2] = {
+  {0, 100}, // Ambient Heating Temps (not used)
   {55, 60}, // Greenhouse Temps
   {90, 100}, // reservoir Temps
   {130, 140}, // Radiator Temps
@@ -34,13 +39,13 @@ int heatArr[6][2] = {
 #define enclosureDHT22 22
 #define greenhouseDHT22 23
 #define ambientDHT22 24
-#define coolingDHT22 25
+//#define coolingDHT22 25
 
 DHT dht[] = {
   {enclosureDHT22, DHT22},
   {greenhouseDHT22, DHT22},
   {ambientDHT22, DHT22},
-  {coolingDHT22, DHT22},
+  //{coolingDHT22, DHT22},
 };
 
 // DS18B20 Sensor Setup
@@ -49,20 +54,19 @@ OneWire oneWire(30);
 DallasTemperature sensors(&oneWire);
 
 // DS18B20 Sensor Addresses
-uint8_t oneWireAddress[6][8] = {
-  //{ 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Greenhouse
-  { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 Reservoir
-  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 Greenhouse
-  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 Radiator
-  // { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #5 Defective?
-  // { 0x28, 0xAA, 0x57, 0xAF, 0x1A, 0x13, 0x02, 0x5F }, // #4 defective
-  { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }, // #3 Bench 1
-  { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }, // #2 Bench 2
-  { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }, // #1 Bench 3
+uint8_t oneWireAddress[7][8] = {
+  { 0x28, 0xAA, 0xC4, 0x13, 0x1B, 0x13, 0x02, 0x8E }, // #1 OK 01/06/2021
+  { 0x28, 0xA9, 0xAC, 0x0F, 0x30, 0x14, 0x01, 0x0B }, // #2 OK 01/06/2021
+  { 0x28, 0xAA, 0xE8, 0xBD, 0x37, 0x14, 0x01, 0x48 }, // #4 OK 01/06/2021
+  { 0x28, 0xAA, 0x3C, 0xF9, 0x37, 0x14, 0x01, 0xE7 }, // #5 OK 01/06/2021
+  { 0x28, 0xAA, 0x4D, 0xC0, 0x37, 0x14, 0x01, 0x9C }, // #6 OK 01/06/2021
+  { 0x28, 0xAA, 0xCB, 0x64, 0x26, 0x13, 0x02, 0x01 }, // #7 OK 01/06/2021
+  { 0x28, 0xAA, 0xC6, 0xEE, 0x37, 0x14, 0x01, 0x42 }, // #8 OK 01/06/2021
 };
 
 // Temperature Data from DS18B20 sensors, heat ON/OFF LOW/HIGH
-int oneWireData[6][2] = {
+int oneWireData[7][2] = {
+  {0, HIGH}, // Ambient (heat not used)
   {0, HIGH}, // Greenhouse
   {0, HIGH}, // Reservoir
   {0, HIGH}, // Radiator
@@ -71,7 +75,8 @@ int oneWireData[6][2] = {
   {0, HIGH}, // Bench 3
 };
 
-String oneWireDesc[6] = {
+String oneWireDesc[7] = {
+  "Ambient Temperature,"
   "Greenhouse Temperature,",
   "Reservoir Temperature,",
   "Radiator Temperature,",
@@ -130,19 +135,21 @@ void loop()
     setHeat();
     writePins();
 
-    // Checking pin states
-    for (int i = 1; i < 16; i++)
-    {
-      Serial.print(pinState[i]);
-    }
-    Serial.println();
+    /*
+      // Checking pin states
+      for (int i = 1; i < 16; i++)
+      {
+        Serial.print(pinState[i]);
+      }
+      Serial.println();
+    */
   }
 }
 
 // Print the initial data headings in serial output
 void printHeadings() {
   // DHT Sensor heading
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 3; i++) {
     Serial.print(dhtDataDesc[i][0]);
     Serial.print(dhtDataDesc[i][1]);
   }
@@ -167,7 +174,7 @@ void checkSerialInput() {
 
 void measureTemps() {
   //Loop through each DHT22 sensor
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 3; i++) {
     //Read each DHT Sensor temp and humidity and write to array
     float t = dht[i].readTemperature(true);
     float h = dht[i].readHumidity();
@@ -181,7 +188,9 @@ void measureTemps() {
     if ( isnan(h)) {
       dhtData[i][1] = 999;
     }
-    else dhtData[i][1] = h;
+    else {
+      dhtData[i][1] = h;
+    }
 
     // Print temp and humidity to serial
     Serial.print(dhtData[i][0]);
@@ -223,10 +232,10 @@ void setCoolingStage() {
     Serial.println("Both greenhouse sensors out of range; abort setting heat/cool stage");
     return;
   }
-  Serial.print(temp);
-  Serial.print(" deg f ");
-  Serial.print("Cooling Stage: ");
-  Serial.println(coolingStage); // Temporary check temp is correct
+  //Serial.print(temp);
+  //Serial.print(" deg f ");
+  //Serial.print("Cooling Stage: ");
+  //Serial.println(coolingStage); // Temporary check temp is correct
 
   //Heat ON
   if (temp <= setPointArray[0]) {
@@ -251,7 +260,7 @@ void setCoolingStage() {
   }
   Serial.print("CoolingStage: ");
   Serial.println(coolingStage);
-};
+}
 
 void fanSpeed() {
   // Cooling Stage 0 or -1; No cooling, Turn OFF evap cooler, water pump, and vent
@@ -341,13 +350,13 @@ void setHeat() {
   // ms since heat reset
   tempTime = millis() - heaterTime;
 
-  // Reset timer after heafOff cooldown timer
+  // Reset timer after heatOff cooldown exceeded
   if (tempTime > heatCooldown) {
     heaterTime = millis();
     Serial.println("RESET heat Timer");
   }
 
-  for (int i = 0; i <= 6; i++) {
+  for (int i = 1; i <= 6; i++) { // Skipping pos 0, ambient temp
     int temp = oneWireData[i][0]; // Temp
     int heat = oneWireData[i][1]; // Heat ON/OFF
     int maxTemp = heatArr[i][0]; // Max Temp
@@ -366,28 +375,29 @@ void setHeat() {
       heat = HIGH;
     }
   }
+  int greenhouse = oneWireData[1][1]; // greenhouse heating ON/OFF setting
+  int reservoir = oneWireData[2][1]; // reservior actuator ON/OFF setting
+  int radiator = oneWireData[3][1]; // radiator actuator ON/OFF setting
 
-  int reservoir = oneWireData[1][1]; // reservior actuator ON/OFF setting
-  int radiator = oneWireData[2][1]; // radiator actuator ON/OFF setting
-  // If reservoir needs to be heated turn off radiator and actuator
-  if (reservoir  == LOW) {
+
+  // If greenhouse is not heating turn off radiator heating OR
+  // If reservior needs to be headed turn off radiator heating
+  if (greenhouse = HIGH || reservoir  == LOW ) {
     radiator = HIGH;
   }
-
-  // Turn on heat pump for reservior or radiator
-  if (reservoir == LOW || radiator == LOW) {
+  // Heat reservoir
+  if (reservoir == LOW) {
     pinState[9] = LOW; // Turn on heater pump
-    // Heat reservoir
-    if (reservoir == LOW) {
-      pinState[14] = LOW; // Turn ON reservoir actuator
-      pinState[15] = HIGH; // Turn OFF radiator actuator
-    }
-    // Heat radiator
-    if (radiator == LOW) {
-      pinState[14] = HIGH; // Turn OFF reservoir actuator
-      pinState[15] = LOW; // Turn ON radiator actuator
-    }
+    pinState[14] = LOW; // Turn ON reservoir actuator
+    pinState[15] = HIGH; // Turn OFF radiator actuator
   }
+  // Heat radiator
+  if (radiator == LOW) {
+    pinState[9] = LOW; // Turn on heater pump
+    pinState[14] = HIGH; // Turn OFF reservoir actuator
+    pinState[15] = LOW; // Turn ON radiator actuator
+  }
+
 
   // HEATER COOLDOWN TIMER
   // If heater is in cooldown turn off heater pump
@@ -401,12 +411,10 @@ void setHeat() {
 
   // Cycle through bench temps and turn on circ pump and actuator when needed
   pinState[10] = HIGH; // Initially turn OFF circ pump, turn ON with actuators
-
   // TODO: add greenhouse, reservoir and radiator heating to this loop
-  for (int i = 3; i < 6; i++) {
-    int temp = oneWireData[i][0];
+  for (int i = 4; i <= 6; i++) {
     int heatSetting = oneWireData[i][1];
-    int pin = i + 8; // Actuator pins are 11-13
+    int pin = i + 7; // Actuator pins are 11-13
     if (heatSetting == LOW) {
       pinState[pin] = LOW; // Actuator ON
       pinState[10] = LOW; // Circ pump ON if at least one actuator is on
@@ -416,7 +424,7 @@ void setHeat() {
 
 // Write all the pin states on OUTPUT pins
 void writePins() {
-  for (int i = 1; i <= 16; i++) {
+  for (int i = 1; i < 16; i++) {
     int pinLocation = i + 30; // Pin location corresponds to 31-46
     digitalWrite(pinLocation, pinState[i]);
   }
