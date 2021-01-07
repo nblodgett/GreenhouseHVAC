@@ -81,7 +81,9 @@ String oneWireDesc[6] = {
 };
 
 int coolingStage = 0; // Current cooling stage
-int pinState[16]; // Array of pin output states corresponds with pins 31-46
+int pinState[16]; // Array of pin output states corresponds with pins 31-45
+// array position 0 unused
+// pin 46, and relay 16 unused
 
 // Set heating and cooling temperatures in degrees F
 int setPointArray[12];
@@ -129,7 +131,7 @@ void loop()
     writePins();
 
     // Checking pin states
-    for (int i = 0; i < 16; i++)
+    for (int i = 1; i < 16; i++)
     {
       Serial.print(pinState[i]);
     }
@@ -167,8 +169,20 @@ void measureTemps() {
   //Loop through each DHT22 sensor
   for (int i = 0; i < 4; i++) {
     //Read each DHT Sensor temp and humidity and write to array
-    dhtData[i][0] = dht[i].readTemperature(true);
-    dhtData[i][1] = dht[i].readHumidity();
+    float t = dht[i].readTemperature(true);
+    float h = dht[i].readHumidity();
+
+    if ( isnan(t)) {
+      dhtData[i][0] = 999;
+    }
+    else {
+      dhtData[i][0] = t;
+    }
+    if ( isnan(h)) {
+      dhtData[i][1] = 999;
+    }
+    else dhtData[i][1] = h;
+
     // Print temp and humidity to serial
     Serial.print(dhtData[i][0]);
     Serial.print(", ");
@@ -181,7 +195,9 @@ void measureTemps() {
   // Loop through all DS18B20 sensors
   for (int i = 0; i < 7; i++) {
     // Get temps and write to array
-    oneWireData[i][0] = sensors.getTempF(oneWireAddress[i]);
+    float t = sensors.getTempF(oneWireAddress[i]);
+    oneWireData[i][0] = t;
+
     // Print temps to serial
     Serial.print(oneWireData[i][0]);
     Serial.print(",");
@@ -192,9 +208,9 @@ void measureTemps() {
 
 void setCoolingStage() {
   int dhtTemp = dhtData[1][0];
-  int dsTemp = oneWireData[0];
+  int dsTemp = oneWireData[1][0];
   // Error checking data, turn off greenhouse if both temperatures are errors
-  int temp = 999;
+  int temp = -999;
 
   if (dhtTemp > -50 && dhtTemp < 200) {
     temp = dhtTemp;
@@ -207,8 +223,10 @@ void setCoolingStage() {
     Serial.println("Both greenhouse sensors out of range; abort setting heat/cool stage");
     return;
   }
-
-  Serial.println(temp); // Temporary check temp is correct
+  Serial.print(temp);
+  Serial.print(" deg f ");
+  Serial.print("Cooling Stage: ");
+  Serial.println(coolingStage); // Temporary check temp is correct
 
   //Heat ON
   if (temp <= setPointArray[0]) {
@@ -236,24 +254,25 @@ void setCoolingStage() {
 };
 
 void fanSpeed() {
-  // Set Point 0 - No heating or cooling - Turn OFF evap cooler, water pump, and vent
+  // Cooling Stage 0 or -1; No cooling, Turn OFF evap cooler, water pump, and vent
   if (coolingStage <= 0) {
     // Turn OFF fans, water pump, and close vents
-    for (int i = 2; i <= 8; i++) {
+    for (int i = 1; i <= 8; i++) {
       pinState[i] = HIGH;
     }
+    return;
   }
 
   // Anything else start cooling
-  else {
-    pinState[8] = LOW; // Exhaust relay 2 ON
-    pinState[7] = LOW; // Exhause relay 1 ON
-    pinState[6] = LOW; // Evaporative cooling water pump ON
-    pinState[5] = HIGH; // Turn OFF HI fan speed
-    pinState[4] = HIGH; // Turn OFF MED fan speed
-    pinState[3] = HIGH; // Turn OFF LOW fan speed
-    pinState[2] = HIGH; // Turn OFF HI Intake Fan
-  }
+  pinState[8] = LOW; // Exhaust relay 2 ON
+  pinState[7] = LOW; // Exhause relay 1 ON
+  pinState[6] = LOW; // Evaporative cooling water pump ON
+  pinState[5] = HIGH; // Turn OFF HI fan speed
+  pinState[4] = HIGH; // Turn OFF MED fan speed
+  pinState[3] = HIGH; // Turn OFF LOW fan speed
+  pinState[2] = HIGH; // Turn OFF HI Intake Fan
+  //pinState[1] = HIGH; // Turn OFF misters, controlled by mistingRelay func
+
   // Changed to turn fan on HI on all setttings to avoid issues starting fan at lower speed
   // SetPoint 1 - Low fan setting
   if (coolingStage == 1) {
@@ -342,8 +361,8 @@ void setHeat() {
     }
     // Error checking, turn OFF heat if DS18B20 errors
     if (temp < -50 || temp > 200) {
-      Serial.println("Abort heating, temp out of range on DS18b20 array position: ");
-      Serial.println(i);
+      //Serial.println("Abort heating, temp out of range on DS18b20 array position: ");
+      //Serial.println(i);
       heat = HIGH;
     }
   }
@@ -382,7 +401,8 @@ void setHeat() {
 
   // Cycle through bench temps and turn on circ pump and actuator when needed
   pinState[10] = HIGH; // Initially turn OFF circ pump, turn ON with actuators
-  
+
+  // TODO: add greenhouse, reservoir and radiator heating to this loop
   for (int i = 3; i < 6; i++) {
     int temp = oneWireData[i][0];
     int heatSetting = oneWireData[i][1];
