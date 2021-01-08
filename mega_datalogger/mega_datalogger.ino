@@ -36,9 +36,9 @@ int heatArr[7][2] = {
   {78, 80}, // Bench #3 Temps
 };
 
-#define enclosureDHT22 22
-#define greenhouseDHT22 23
-#define ambientDHT22 24
+#define enclosureDHT22 27
+#define greenhouseDHT22 28
+#define ambientDHT22 29
 //#define coolingDHT22 25
 
 DHT dht[] = {
