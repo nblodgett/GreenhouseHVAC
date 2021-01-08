@@ -10,8 +10,8 @@
 int incomingByte = 0; // for incoming serial data
 unsigned long tempTime = 0; // millis - heaterTime
 unsigned long heaterTime = 0; //Heater cooldown timer
-int heatOn = 6000; // ms heater is on 600000
-int heatCooldown = 7000; // ms heater cools down, to avoid shutoff 660000
+int heatOn = 60000; // ms heater is on 600000
+int heatCooldown = 660000; // ms heater cools down, to avoid shutoff 660000
 
 unsigned long loopTime = 0; // Loop timer
 int loopInterval = 5000; // ms between loop measurement intervals
